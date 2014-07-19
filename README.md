@@ -30,6 +30,7 @@ So, I figured someone else might get some use out of it.
   * Columns can be filtered out from processing
   * Rows can be filtered out from processing based on numeric constraint
   * Rows can be filtered out from processing based on string constraint
+  * Rows can be sampled uniformly or randomly.
   * Initial header rows can be skipped
   * Fixed number of rows can be processed
   * Duplicate delimiters can be ignored
@@ -53,7 +54,7 @@ So, I figured someone else might get some use out of it.
 
  - All statistics are computed on a rolling basis and not by using the
    entire dataset, so all statistics (except minimum, maximum, and count) are
-   approximations.
+   approximations. When row sampling is used all statistics are approximations.
 
  - The histogram is also computed on a rolling basis with a
    dynamic histogram merging algorithm. New data points that do not fall

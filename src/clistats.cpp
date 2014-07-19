@@ -20,6 +20,7 @@
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
+#include <cstdlib>
 #include <string>
 #include <utility>
 #include <vector>
@@ -1554,6 +1555,27 @@ struct StatisticsTrackerOptions
 };
 
 /**
+ * @struct SamplerOptions
+ */
+struct SamplerOptions
+{
+    enum SampleMode
+    {
+        DEFAULT = 0,
+        UNIFORM,
+        RANDOM
+    };
+
+    SamplerOptions()
+    {
+        this->mode = SamplerOptions::DEFAULT;
+        this->step = 1;
+    }
+    SampleMode mode;
+    unsigned int step;
+};
+
+/**
  * @struct CommandLineOptions
  */
 struct CommandLineOptions
@@ -1571,6 +1593,7 @@ struct CommandLineOptions
         this->numLinesToReshape = 1;
         this->numLinesToSkip = 0;
         this->removeDuplicates = false;
+        this->seed = 1;
         this->showCorrelation = false;
         this->showCovariance = false;
         this->showFilteredData = false;
@@ -1593,6 +1616,8 @@ struct CommandLineOptions
     unsigned int numLinesToReshape;
     unsigned int numLinesToSkip;
     bool removeDuplicates;
+    SamplerOptions sampling;
+    unsigned int seed;
     bool showCorrelation;
     bool showCovariance;
     bool showHistogram;
@@ -1642,8 +1667,8 @@ public:
         std::cout << "    clistats [-h] [-v <level>] [-V] [-i <file>] [-o <file>] [-a <code>] [-b]" << std::endl;
         std::cout << "             [-c <character>] [-d <character>] [-fc <filter>] [-fn <filter>]" << std::endl;
         std::cout << "             [-fs <filter>] [-k <rows>] [-r] [-rs <rows>] [-s <rows>]" << std::endl;
-        std::cout << "             [-st] [-t <row>] [-cr] [-cv] [-fd] [-hg <bins>,[cache]] [-lo]" << std::endl;
-        std::cout << "             [-ls] [-ss] < [file]" << std::endl;
+        std::cout << "             [-se <seed>] [-sr <step>] [-st] [-su <step>] [-t <row>] [-cr]" << std::endl;
+        std::cout << "             [-cv] [-fd] [-hg <bins>,[cache]] [-lo] [-ls] [-ss] < [file]" << std::endl;
         std::cout << std::endl;
         std::cout << "DESCRIPTION" << std::endl;
         std::cout << std::endl;
@@ -1784,11 +1809,30 @@ public:
         std::cout << "            Number of rows to skip before processing begins (e.g., header row)" << std::endl;
         std::cout << "            Default = 0 (process all rows)." << std::endl;
         std::cout << std::endl;
+        std::cout << "        -se <seed>" << std::endl;
+        std::cout << "        --seed <seed>" << std::endl;
+        std::cout << "            Seed for random number generator when using \"-sr\" option." << std::endl;
+        std::cout << "            <seed> can take values in the range [1," << RAND_MAX << "]." << std::endl;
+        std::cout << "            If set to 0 then the current time is used as the seed." << std::endl;
+        std::cout << "            Default = 1." << std::endl;
+        std::cout << std::endl;
+        std::cout << "        -sr <step>" << std::endl;
+        std::cout << "        --samplerandom <step>" << std::endl;
+        std::cout << "            Sample the rows to be processed randomly in intervals of given" << std::endl;
+        std::cout << "            step size. One row is randomly chosen every \"step\" rows." << std::endl;
+        std::cout << "            Use \"-se\" to change the random number generator seed." << std::endl;
+        std::cout << "            Mutually exclusive with option \"-su\"." << std::endl;
+        std::cout << std::endl;
         std::cout << "        -st" << std::endl;
         std::cout << "        --strict" << std::endl;
         std::cout << "            Strictly enforce parsing to only accept rows with the same number" << std::endl;
         std::cout << "            of tokens as the first successfully parsed row. Default is to" << std::endl;
         std::cout << "            allow missing tokens." << std::endl;
+        std::cout << std::endl;
+        std::cout << "        -su <step>" << std::endl;
+        std::cout << "        --sampleuniform <step>" << std::endl;
+        std::cout << "            Sample the rows to be processed uniformly in intervals of given" << std::endl;
+        std::cout << "            step size. Mutually exclusive with option \"-sr\"." << std::endl;
         std::cout << std::endl;
         std::cout << "        -t <row>" << std::endl;
         std::cout << "        --titles <row>" << std::endl;
@@ -2291,9 +2335,73 @@ private:
                 arguments.pop_front();
                 arguments.pop_front();
             }
+            else if (flag == "-se" || flag == "--seed")
+            {
+                // Parse skip flag value for a single positive integer
+                int seed = 0;
+                std::string value = "";
+                if ((++argument) != arguments.end())
+                {
+                    value = *argument;
+                }
+                bool isInt = StringParser::toValue<int>(value, seed);
+                if (!(isInt && seed >= 0))
+                {
+                    throw std::runtime_error("Invalid seed value");
+                }
+                this->options.seed = seed;
+                arguments.pop_front();
+                arguments.pop_front();
+            }
+            else if (flag == "-sr" || flag == "--samplerandom")
+            {
+                // Parse step flag value for a single non-negative integer
+                int step = 0;
+                std::string value = "";
+                if ((++argument) != arguments.end())
+                {
+                    value = *argument;
+                }
+                bool isInt = StringParser::toValue<int>(value, step);
+                if (!(isInt && step >= 1))
+                {
+                    throw std::runtime_error("Invalid random sampling step size. Must be >= 1.");
+                }
+                if (this->options.sampling.mode != SamplerOptions::DEFAULT)
+                {
+                    throw std::runtime_error("Cannot use multiple sampling options.");
+                }
+                this->options.sampling.mode = SamplerOptions::RANDOM;
+                this->options.sampling.step = step;
+                arguments.pop_front();
+                arguments.pop_front();
+            }
             else if (flag == "-st" || flag == "--strict")
             {
                 this->options.strictParsing = true;
+                arguments.pop_front();
+            }
+            else if (flag == "-su" || flag == "--sampleuniform")
+            {
+                // Parse step flag value for a single non-negative integer
+                int step = 0;
+                std::string value = "";
+                if ((++argument) != arguments.end())
+                {
+                    value = *argument;
+                }
+                bool isInt = StringParser::toValue<int>(value, step);
+                if (!(isInt && step >= 1))
+                {
+                    throw std::runtime_error("Invalid uniform sampling step size. Must be >= 1.");
+                }
+                if (this->options.sampling.mode != SamplerOptions::DEFAULT)
+                {
+                    throw std::runtime_error("Cannot use multiple sampling options.");
+                }
+                this->options.sampling.mode = SamplerOptions::UNIFORM;
+                this->options.sampling.step = step;
+                arguments.pop_front();
                 arguments.pop_front();
             }
             else if (flag == "-cv" || flag == "--covariance")
@@ -3315,6 +3423,88 @@ private:
 };
 
 /**
+ * @class RowSampler
+ * @brief Class to decide if current entry should be sampled
+ */
+class RowSampler
+{
+public:
+
+    /**
+     * @param[in] options Sampler Options
+     */
+    RowSampler(SamplerOptions const & options) :
+        _count(0),
+        _next(1),
+        _mode(options.mode),
+        _step(options.step)
+    {
+    }
+
+    /**
+     * Determine if current sample should be used
+     * @return True if sample should be used otherwise false
+     */
+    bool
+    sample()
+    {
+        // Don't bother if samling every row
+        if (this->_step == 1) return true;
+
+        // Bump row counter
+        this->_count++;
+
+        // Check if this row is sampled
+        if (this->_count == this->_next)
+        {
+            // Bump sampled counter
+            this->_sampled++;
+
+            // If yes, determine next row in this sampling bin to sample
+            unsigned int row = 1;
+            if (this->_mode == SamplerOptions::RANDOM)
+            {
+                row = 1 + (unsigned int)(rand() % this->_step);
+            }
+            this->_next = this->_sampled * this->_step + row;
+
+            return true;
+        }
+
+        return false;
+
+    }
+
+private:
+
+     /**
+      * Number of rows tested for sampling
+      */
+    unsigned int _count;
+
+     /**
+      * Next row to sample
+      */
+    unsigned int _next;
+
+   /**
+    * Sampling mode
+    */
+    SamplerOptions::SampleMode _mode;
+
+    /**
+     * Number of sampled rows
+     */
+    unsigned int _sampled;
+
+    /**
+     * Sampling step size
+     */
+    unsigned int _step;
+
+};
+
+/**
  * @class StatisticsApp
  * @brief statistics application
  */
@@ -3332,6 +3522,11 @@ public:
         _tracker(MultivariateTracker(0, options.statisticsOptions))
     {
         Logger::logLevel = (Logger::Level::Type)this->_options.verboseLevel;
+
+        // ==================================================
+        // Seed random number generator
+        // --------------------------------------------------
+        srand((options.seed == 0 ? time(0) : options.seed));
 
         // ==================================================
         // Define output stream
@@ -3370,6 +3565,11 @@ public:
         // Define output writer
         // --------------------------------------------------
         StatisticsWriter writer;
+
+        // ==================================================
+        // Define row sampler
+        // --------------------------------------------------
+        RowSampler sampler(this->_options.sampling);
 
         // ==================================================
         // Loop through source data
@@ -3469,6 +3669,15 @@ public:
             {
                 LOG_MESSAGE(Logger::Level::INFO, "Skipping remaining lines.");
                 break;
+            }
+
+            // ==================================================
+            // Skip unsampled rows
+            // --------------------------------------------------
+            if (!sampler.sample())
+            {
+                LOG_MESSAGE(Logger::Level::DETAIL, "Row not sampled. Skipping");
+                continue;
             }
 
             // ==================================================
