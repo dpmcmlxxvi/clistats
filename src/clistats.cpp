@@ -3436,6 +3436,7 @@ public:
     RowSampler(SamplerOptions const & options) :
         _count(0),
         _next(1),
+        _sampled(0),
         _mode(options.mode),
         _step(options.step)
     {
@@ -3993,7 +3994,7 @@ namespace AppStatus
  *          - 3 = Displaying statistics failed
  */
 int
-main(int argc,
+pdrv(int argc,
      char * argv[])
 {
 
@@ -4057,3 +4058,12 @@ main(int argc,
     return AppStatus::SUCCESS;
 
 }
+
+#ifndef _CLISTATS_TESTING
+int
+main(int argc,
+     char * argv[])
+{
+    return pdrv(argc, argv);
+}
+#endif

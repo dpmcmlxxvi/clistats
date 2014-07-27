@@ -11,6 +11,10 @@ PROJECT(clistats)
 SET(clistats_src "src/clistats.cpp")
 ADD_EXECUTABLE(clistats ${clistats_src})
 
+# Add executable to project
+SET(test_src "test/clistatstest.cpp")
+ADD_EXECUTABLE(clistatstest ${test_src})
+
 # Add executable to install project
 INSTALL(TARGETS clistats RUNTIME DESTINATION .)
 
