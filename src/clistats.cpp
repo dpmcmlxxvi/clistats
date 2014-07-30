@@ -12,6 +12,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <ctime>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -3527,7 +3528,7 @@ public:
         // ==================================================
         // Seed random number generator
         // --------------------------------------------------
-        srand((options.seed == 0 ? time(0) : options.seed));
+        srand((options.seed == 0 ? (unsigned int)time(0) : options.seed));
 
         // ==================================================
         // Define output stream

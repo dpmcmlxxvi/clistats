@@ -34,7 +34,7 @@
             condition;                              \
             ASSERT(false, message);                 \
         }                                           \
-        catch (std::exception const & ex)           \
+        catch (...)                                 \
         {                                           \
         }                                           \
     }
@@ -49,11 +49,11 @@ void test_stringparser_parsenumer()
     ASSERT_EQUAL(StringParser::parseNumber<int>(1), "1", "StringParser::parseNumber<int> failed on parsing int");
     ASSERT_EQUAL(StringParser::parseNumber<long>(1), "1", "StringParser::parseNumber<long> failed on parsing long");
     ASSERT_EQUAL(StringParser::parseNumber<long long>(1), "1", "StringParser::parseNumber<long long> failed on parsing long");
-    ASSERT_EQUAL(StringParser::parseNumber<float>(1.1), "1.100000", "StringParser::parseNumber<float> failed on parsing float");
+    ASSERT_EQUAL(StringParser::parseNumber<float>((float)1.1), "1.100000", "StringParser::parseNumber<float> failed on parsing float");
     ASSERT_EQUAL(StringParser::parseNumber<double>(1.1), "1.100000", "StringParser::parseNumber<double> failed on parsing double");
     ASSERT_EQUAL(StringParser::parseNumber<long double>(1.1), "1.100000", "StringParser::parseNumber<long double> failed on parsing long double");
-    ASSERT_EQUAL(StringParser::parseNumber<float>(NAN), "nan", "StringParser::parseNumber<float> failed on parsing nan");
-    ASSERT_EQUAL(StringParser::parseNumber<double>(NAN), "nan", "StringParser::parseNumber<double> failed on parsing nan");
+    ASSERT_EQUAL(StringParser::parseNumber<float>(std::numeric_limits<float>::quiet_NaN()), "nan", "StringParser::parseNumber<float> failed on parsing nan");
+    ASSERT_EQUAL(StringParser::parseNumber<double>(std::numeric_limits<double>::quiet_NaN()), "nan", "StringParser::parseNumber<double> failed on parsing nan");
 
 }
 
@@ -67,7 +67,7 @@ void test_stringparser_parsestatistic()
     ASSERT_EQUAL(StringParser::parseStatistic<int>(0,1), "nan", "StringParser::parseStatistic<int> failed on parsing int");
     ASSERT_EQUAL(StringParser::parseStatistic<long>(0,1), "nan", "StringParser::parseStatistic<long> failed on parsing long");
     ASSERT_EQUAL(StringParser::parseStatistic<long long>(0,1), "nan", "StringParser::parseStatistic<long long> failed on parsing long");
-    ASSERT_EQUAL(StringParser::parseStatistic<float>(0,1.1), "nan", "StringParser::parseStatistic<float> failed on parsing float");
+    ASSERT_EQUAL(StringParser::parseStatistic<float>(0,(float)1.1), "nan", "StringParser::parseStatistic<float> failed on parsing float");
     ASSERT_EQUAL(StringParser::parseStatistic<double>(0,1.1), "nan", "StringParser::parseStatistic<double> failed on parsing double");
     ASSERT_EQUAL(StringParser::parseStatistic<long double>(0,1.1), "nan", "StringParser::parseStatistic<long double> failed on parsing long double");
 
