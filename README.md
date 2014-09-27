@@ -1,21 +1,12 @@
 clistats
 ================================================================================
 
-clistats is a command line interface tool to compute statistics for a stream
-of delimited input numbers. The default delimiter is a comma. Input data can
+clistats is a command line interface tool to compute statistics of a set
+of delimited input numbers from a stream such as a Comma Separated Value (.csv)
+or Tab Separated Value (.tsv) file. The default delimiter is a comma. Input data can
 be a file, a redirected pipe, or the manually entered at the console. To stop
 processing and display the statistics during manual input, enter the EOF signal
-(CTRL-D on POSIX systems like Linux or Cygwin or CTRL-Z on Windows). The tool
-has the following features.
-
-clistats came about over many years of needing a simple summary of statistics
-of data contained within a file in a variety of scientific problems - usually,
-a log file that contained some diagnostic data that would get processed with
-grep/awk/sed and then there would be some columns that I needed a summary of.
-The first version was written years ago and more and more functionality
-was added to it as more requirements came along. Its focus has been on
-functionality and not speed but it's always performed well for my needs.
-So, I figured someone else might get some use out of it.
+(CTRL-D on POSIX systems like Linux or Cygwin or CTRL-Z on Windows).
 
 ###I/O options
 
@@ -181,6 +172,8 @@ which will display an image representation of the correlation matrix. You'll
 see any "nan" strings are interpreted as undefined values by gnuplot and
 rendered as black.
 
+![Correlation](/examples/correlation.png?raw=true "Correlation")
+
 ### Column filtering
 
 Column filters can be used to removed unwanted columns from the computed
@@ -189,6 +182,8 @@ modified to additionally filter out the first column and remove the
 unwanted "nan" strings.
 
     ./clistats --titles 1 --filterColumn "8:10,12:13,15" --correlation < Batting.csv | gnuplot -p -e 'plot "-" matrix with image title "Correlation"'
+
+![Column Filtering](/examples/column-filtering.png?raw=true "Column Filtering")
 
 ### Row filtering
 
