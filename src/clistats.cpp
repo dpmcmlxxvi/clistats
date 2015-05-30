@@ -43,16 +43,30 @@
  */
 struct ApplicationProperties
 {
+    /**
+     * Application version
+     * @returns Version string
+     */
+    static
+    std::string
+    version()
+    {
+        return ApplicationProperties::VERSION_MAJOR + "." +
+            ApplicationProperties::VERSION_MINOR + "." +
+            ApplicationProperties::VERSION_PATCH;
+    }
     static std::string NAME;
     static std::string AUTHOR;
     static std::string VERSION_MAJOR;
     static std::string VERSION_MINOR;
+    static std::string VERSION_PATCH;
 };
 
 std::string ApplicationProperties::NAME = "clistats";
 std::string ApplicationProperties::AUTHOR = "dpmcmlxxvi@gmail.com";
-std::string ApplicationProperties::VERSION_MAJOR = "0";
-std::string ApplicationProperties::VERSION_MINOR = "1";
+std::string ApplicationProperties::VERSION_MAJOR = "1";
+std::string ApplicationProperties::VERSION_MINOR = "0";
+std::string ApplicationProperties::VERSION_PATCH = "0";
 
 /**
  * @struct Logger
@@ -1655,8 +1669,9 @@ public:
     /**
      * Print software usage
      */
+    static
     void
-    printUsage() const
+    printUsage()
     {
         std::cout << std::endl;
         std::cout << "NAME" << std::endl;
@@ -1888,10 +1903,11 @@ public:
     /**
      * Print software version
      */
+    static
     void
-    printVersion() const
+    printVersion()
     {
-        std::cout << ApplicationProperties::VERSION_MAJOR << "." << ApplicationProperties::VERSION_MINOR << std::endl;
+        std::cout << ApplicationProperties::version() << std::endl;
     }
 
     /**
@@ -4009,12 +4025,12 @@ pdrv(int argc,
         CommandLineParser parser(argc, argv);
         if (parser.showUsage())
         {
-            parser.printUsage();
+            CommandLineParser::printUsage();
             return AppStatus::SUCCESS;
         }
         else if (parser.showVersion())
         {
-            parser.printVersion();
+            CommandLineParser::printVersion();
             return AppStatus::SUCCESS;
         }
         options = parser.options;

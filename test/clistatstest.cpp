@@ -594,7 +594,7 @@ main(int argc,
     // Display header
     // ----------------------------------------------------------------------
     std::cout << std::endl;
-    std::cout << "        Testing " << ApplicationProperties::NAME  << " " << ApplicationProperties::VERSION_MAJOR << "." << ApplicationProperties::VERSION_MINOR << std::endl;
+    std::cout << "        Testing " << ApplicationProperties::NAME  << " " << ApplicationProperties::version() << std::endl;
     std::cout << std::endl;
 
     std::cout << header << std::endl;
