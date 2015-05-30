@@ -7,6 +7,10 @@ ENDIF(NOT DEFINED CMAKE_INSTALL_PREFIX)
 
 PROJECT(clistats)
 
+SET(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+SET(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} /MT")
+
 # Add executable to project
 SET(clistats_src "src/clistats.cpp")
 ADD_EXECUTABLE(clistats ${clistats_src})
