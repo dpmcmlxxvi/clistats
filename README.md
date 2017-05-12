@@ -8,13 +8,13 @@ be a file, a redirected pipe, or the manually entered at the console. To stop
 processing and display the statistics during manual input, enter the EOF signal
 (CTRL-D on POSIX systems like Linux or Cygwin or CTRL-Z on Windows).
 
-###I/O options
+### I/O options
 
   * Input data can be from a file, standard input, or a pipe
   * Output can be written to a file, standard output, or a pipe
   * Output uses headers that start with "#" to enable piping to gnuplot
     
-###Parsing options
+### Parsing options
 
   * Signal, end-of-file, or blank line based detection to stop processing
   * Comment and delimiter character can be set
@@ -29,7 +29,7 @@ processing and display the statistics during manual input, enter the EOF signal
   * Strictly enforce that only rows of the same size are processed
   * A row containing column titles can be used to title output statistics
     
-###Statistics options
+### Statistics options
 
   * Summary statistics (Count, Minimum, Mean, Maximum, Standard deviation)
   * Covariance
@@ -39,7 +39,7 @@ processing and display the statistics during manual input, enter the EOF signal
   * Histogram
   * Raw data after filtering
     
-###Warnings
+### Warnings
  - Delimiters are not preserved if in quotes. Any delimiter character will
    cause the row to be split.
 
