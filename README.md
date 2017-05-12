@@ -235,11 +235,11 @@ To display a full listing of the application options use
 INSTALL
 ================================================================================
 
-###Build with Make
+### Build with Make
 
 A simple GNU make file is provided to build the code. Just run "make".
 
-###Build with CMake
+### Build with CMake
 
 A CMake file is also provided to build out of source and provided for
 future development.
