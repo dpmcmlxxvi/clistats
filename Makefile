@@ -1,4 +1,3 @@
-
 # Simple makefile for clistats
 CPP=g++
 CPPFLAGS=-O2
@@ -10,8 +9,8 @@ all: clistats
 
 # Compile and build clistats
 clistats: src/clistats.cpp
-	$(CPP) $(CPPFLAGS) src/clistats.cpp -o clistats.exe
+	$(CPP) $(CPPFLAGS) src/clistats.cpp -o $@
 
 # Removed clistats executable
 clean:
-	$(RM) $(RMFLAGS) clistats.exe
+	$(RM) $(RMFLAGS) clistats
