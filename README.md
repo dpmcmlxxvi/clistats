@@ -69,12 +69,12 @@ generate.
 
  - [|STAT](http://hcibib.org/perlman/stat/)
  - [Average](http://sourceforge.net/projects/average/)
- - [datastat] (http://sourceforge.net/projects/datastat/)
+ - [datastat](http://sourceforge.net/projects/datastat/)
  - [qstat](https://github.com/tonyfischetti/qstats)
- - [st] (https://github.com/nferraz/st)
- - [sta] (https://github.com/simonccarter/sta)
+ - [st](https://github.com/nferraz/st)
+ - [sta](https://github.com/simonccarter/sta)
  - [stats](http://web.cs.wpi.edu/~claypool/misc/stats/stats.html)
- - [stats-tools] (https://github.com/jweslley/stats-tools)
+ - [stats-tools](https://github.com/jweslley/stats-tools)
 
 EXAMPLES
 ================================================================================
