@@ -412,7 +412,7 @@ public:
     T
     toValue(size_type index) const
     {
-        T & dst;
+        T & dst = NULL;
         bool isGood = this->toValue<T>(this->at(index), dst);
         if (!isGood) throw std::runtime_error("Unable to parse string = " + this->at(index));
     }
