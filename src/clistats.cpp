@@ -402,22 +402,6 @@ public:
     }
 
     /**
-     * Convert string to template type value
-     * @param[in] index Token index
-     * @param[out] dst Destination value
-     * @return True if parsing successful otherwise false
-     * @throws std::runtime_error if unable to parse string
-     */
-    template <class T>
-    T
-    toValue(size_type index) const
-    {
-        T & dst = NULL;
-        bool isGood = this->toValue<T>(this->at(index), dst);
-        if (!isGood) throw std::runtime_error("Unable to parse string = " + this->at(index));
-    }
-    
-    /**
      * Convert string to range of integers. Expected format is
      * "A:B". If a range is found (e.g., 3:5) then the array
      * of numbers from the first to the second are returned
