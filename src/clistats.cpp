@@ -65,7 +65,7 @@ struct ApplicationProperties
 std::string ApplicationProperties::NAME = "clistats";
 std::string ApplicationProperties::AUTHOR = "dpmcmlxxvi@gmail.com";
 std::string ApplicationProperties::VERSION_MAJOR = "1";
-std::string ApplicationProperties::VERSION_MINOR = "0";
+std::string ApplicationProperties::VERSION_MINOR = "1";
 std::string ApplicationProperties::VERSION_PATCH = "0";
 
 /**
