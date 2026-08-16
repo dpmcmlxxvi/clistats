@@ -692,7 +692,7 @@ public:
         double dValue = (double) value;
 
         /* Add new data to cache if histogram is uninitialized or not within its bounds */
-        if (!(this->_initialized & this->contains_(dValue)))
+        if (!(this->_initialized && this->contains_(dValue)))
         {
             /* If cache is full then merge the cache and the histogram first */
             if (this->_cache.full())
@@ -1043,7 +1043,18 @@ protected:
             // Compute new bounds
             this->_binMax = this->_cache.max();
             this->_binMin = this->_cache.min();
-            this->_binWidth = (this->_binMax - this->_binMin) / (double) (this->_binCount);
+
+            double range = this->_binMax - this->_binMin;
+            if (range <= 0.0) {
+                // All values identical.  Use a fixed width of 1.0 so that
+                // later dynamic expansion stays numerically stable.
+                double mid = this->_binMin;
+                this->_binWidth = 1.0;
+                this->_binMin   = mid - 0.5 * this->_binWidth * this->_binCount;
+                this->_binMax   = mid + 0.5 * this->_binWidth * this->_binCount;
+            } else {
+                this->_binWidth = range / (double) this->_binCount;
+            }
 
             // Update with cache data
             for (int i = 0; i < this->_cache.count(); i++)
@@ -2737,12 +2748,10 @@ public:
             if (this->_options.doVar)
             {
                 // update variance
-                double scale = (this->_count - 1.0) / (double) this->_count;
-                this->_variance *= scale;
-                this->_variance += delta * delta * scale / (double) this->_count;
-                
+                // Welford increment (delta holds old mean, _mean is already new)
+                this->_variance = (this->_count-1) * this->_variance + delta * (value - this->_mean);
+                this->_variance /= this->_count;
             }
-
         }
 
         if (this->_options.histogramOptions.enabled)
@@ -2864,6 +2873,10 @@ public:
     {
         double varI = this->getCovariance(i,i);
         double varJ = this->getCovariance(j,j);
+        if (varI <= 0.0 || varJ <= 0.0)
+        {
+            return 0.0;
+        }
         return this->getCovariance(i,j) / (sqrt(varI) * sqrt(varJ));
     }
 
