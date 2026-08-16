@@ -1,6 +1,8 @@
 clistats
 ================================================================================
 
+![CI](https://github.com/dpmcmlxxvi/clistats/actions/workflows/ci.yml/badge.svg)
+
 clistats is a command line interface tool to compute statistics of a set
 of delimited input numbers from a stream such as a Comma Separated Value (.csv)
 or Tab Separated Value (.tsv) file. The default delimiter is a comma. Input data can
