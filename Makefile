@@ -1,6 +1,6 @@
 # Simple makefile for clistats
 CPP=g++
-CPPFLAGS=-O2
+CPPFLAGS=-O2 -std=c++17 -Wall -Wextra -Wconversion
 RM=/bin/rm
 RMFLAGS=-f
 

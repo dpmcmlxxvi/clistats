@@ -144,7 +144,7 @@ void test_stringparser_trim()
 void test_stringparser_updatewidthnumber()
 {
 
-    long width = 0;
+    int width = 0;
     StringParser::updateWidthNumber<short>(1, width);
     ASSERT_EQUAL(width, 1, "StringParser::updateWidthNumber failed on updating short");
     StringParser::updateWidthNumber<int>(1, width);
@@ -166,7 +166,7 @@ void test_stringparser_updatewidthnumber()
 void test_stringparser_updatewidthstring()
 {
 
-    long width = 0;
+    int width = 0;
     StringParser::updateWidthString("1", width);
     ASSERT_EQUAL(width, 1, "StringParser::updateWidthNumber failed on updating string \"1\"");
     StringParser::updateWidthString("12", width);
@@ -184,18 +184,18 @@ void test_stringparser_updatewidthstring()
 void test_stringsplitter()
 {
 
-    int count = 3;
+    const long count = 3;
     std::string valuesstring = "foo,bar,1";
     const char * valueschar[] = {"foo", "bar", "1"};
 
     StringSplitter splitter(valuesstring,",");
-    for (int i = 0; i < count; i++)
+    for (long i = 0; i < count; i++)
     {
         ASSERT_EQUAL(splitter.at(i), valueschar[i], "StringSplitter::at failed on " << valueschar[i]);
     }
 
     std::vector<std::string> valuesGet(splitter.get());
-    for (int i = 0; i < count; i++)
+    for (long i = 0; i < count; i++)
     {
         ASSERT_EQUAL(valueschar[i], valuesGet.at(i), "StringSplitter::get failed at " << valueschar[i]);
     }
@@ -203,7 +203,7 @@ void test_stringsplitter()
     ASSERT_EQUAL(splitter.size(), count, "StringSplitter::size failed");
 
     std::vector<std::string> valuesTokens(splitter.tokens());
-    for (int i = 0; i < count; i++)
+    for (long i = 0; i < count; i++)
     {
         ASSERT_EQUAL(valueschar[i], valuesTokens.at(i), "StringSplitter::tokens failed at " << valueschar[i]);
     }
@@ -290,7 +290,7 @@ void test_dynamichistogram_disabled()
     ASSERT_EXCEPTION(histogramDisabled.order(0), "DynamicHistogram::order failed on disabled histogram");
     ASSERT_EXCEPTION(histogramDisabled.pdf(), "DynamicHistogram::pdf failed on disabled histogram");
     ASSERT_EXCEPTION(histogramDisabled.total(), "DynamicHistogram::total failed on disabled histogram");
-    ASSERT_EXCEPTION(histogramDisabled.width(0), "DynamicHistogram::width failed on disabled histogram");
+    ASSERT_EXCEPTION(histogramDisabled.width(), "DynamicHistogram::width failed on disabled histogram");
 
 }
 
@@ -367,10 +367,7 @@ void test_dynamichistogram_enabled()
 
     ASSERT_EQUAL(histogramEnabled.total(), 8, "DynamicHistogram::total failed on enabled histogram");
 
-    ASSERT_EQUAL(histogramEnabled.width(0), 1, "DynamicHistogram::width failed on enabled histogram at 0");
-    ASSERT_EQUAL(histogramEnabled.width(1), 1, "DynamicHistogram::width failed on enabled histogram at 1");
-    ASSERT_EQUAL(histogramEnabled.width(2), 1, "DynamicHistogram::width failed on enabled histogram at 2");
-    ASSERT_EQUAL(histogramEnabled.width(4), 1, "DynamicHistogram::width failed on enabled histogram at 4");
+    ASSERT_EQUAL(histogramEnabled.width(), 1, "DynamicHistogram::width failed on enabled histogram at 0");
 
 }
 
@@ -718,11 +715,87 @@ void test_stringsplitter_tointegers_filter_edges()
 }
 
 /**
+ * Test StatisticsApp file input and output
+ */
+void test_statisticsapp_fileio()
+{
+
+    std::string fileInput = "test_statisticsapp_fileio_input.csv";
+    std::string fileOutput = "test_statisticsapp_fileio_output.csv";
+
+    std::ofstream input(fileInput.c_str());
+    input << "1,2" << std::endl;
+    input << "3,4" << std::endl;
+    input.close();
+
+    CommandLineOptions options;
+    options.fileInput = fileInput;
+    options.fileOutput = fileOutput;
+    options.delimiter = ",";
+    options.showStatistics = true;
+
+    StatisticsApp app(options);
+    int status = app.run();
+    ASSERT_EQUAL(status, 0, "StatisticsApp::run failed on file input");
+    app.display();
+
+    std::ifstream output(fileOutput.c_str());
+    std::stringstream contents;
+    contents << output.rdbuf();
+    output.close();
+
+    ASSERT(contents.str().find("Statistics") != std::string::npos, "StatisticsApp::display failed to write statistics to output file");
+
+    std::remove(fileInput.c_str());
+    std::remove(fileOutput.c_str());
+
+}
+
+/**
+ * Test StatisticsApp skips blank lines and comment rows
+ */
+void test_statisticsapp_blankcomment()
+{
+
+    std::string fileInput = "test_statisticsapp_blankcomment_input.csv";
+    std::string fileOutput = "test_statisticsapp_blankcomment_output.csv";
+
+    std::ofstream input(fileInput.c_str());
+    input << "# comment row" << std::endl;
+    input << "1,2" << std::endl;
+    input << std::endl;
+    input << "3,4" << std::endl;
+    input.close();
+
+    CommandLineOptions options;
+    options.fileInput = fileInput;
+    options.fileOutput = fileOutput;
+    options.delimiter = ",";
+    options.comment = "#";
+    options.showStatistics = true;
+
+    StatisticsApp app(options);
+    int status = app.run();
+    ASSERT_EQUAL(status, 0, "StatisticsApp::run failed on blank line and comment row input");
+    app.display();
+
+    std::ifstream output(fileOutput.c_str());
+    std::stringstream contents;
+    contents << output.rdbuf();
+    output.close();
+
+    ASSERT(contents.str().find("2") != std::string::npos, "StatisticsApp::run failed to process rows around blank line and comment");
+
+    std::remove(fileInput.c_str());
+    std::remove(fileOutput.c_str());
+
+}
+
+/**
  * Unit tester for clistats
  */
 int
-main(int argc,
-     char * argv[])
+main()
 {
     
     std::vector<void (*)()> tests;
@@ -754,13 +827,15 @@ main(int argc,
     tests.push_back(test_stringsplitter_tointegers_filter_edges);
     tests.push_back(test_rowsampler_uniform);
     tests.push_back(test_rowsampler_random);
+    tests.push_back(test_statisticsapp_fileio);
+    tests.push_back(test_statisticsapp_blankcomment);
 
     // ======================================================================
     // Define test metrics
     // ----------------------------------------------------------------------
-    unsigned int numTestsTotal = tests.size();
-    unsigned int numTestsPass = 0;
-    unsigned int numTestsFail = 0;
+    unsigned long numTestsTotal = tests.size();
+    unsigned long numTestsPass = 0;
+    unsigned long numTestsFail = 0;
 
     // ======================================================================
     // Display parameters

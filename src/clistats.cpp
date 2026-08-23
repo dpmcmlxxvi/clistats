@@ -144,8 +144,7 @@ public:
                 bool isScientific = false)
     {
         // Check for NaN to consistently return "nan"
-        volatile double d = (double)value;
-        if (d != d) return "nan";
+        if (std::isnan((double)value)) return "nan";
         std::string entry;
         std::stringstream parser;
         parser << (isScientific ? std::scientific : std::fixed) << value;
@@ -164,7 +163,7 @@ public:
     template <class T>
     static
     std::string
-    parseStatistic(int count,
+    parseStatistic(long count,
                    T value,
                    std::string nan = "nan",
                    bool isScientific = false)
@@ -190,7 +189,7 @@ public:
         if(src.empty()) return;
 
         unsigned int count = 0;
-        unsigned int pos = 0;
+        std::string::size_type pos = 0;
         while((pos = content.find(src, pos)) != std::string::npos)
         {
             content.replace(pos, src.length(), dst);
@@ -240,10 +239,11 @@ public:
     static
     void
     updateWidthNumber(T value,
-                      long & width)
+                      int & width)
     {
         std::string entry = StringParser::parseNumber<T>(value);
-        width = (width < (long) entry.size() ? entry.size() : width);
+        int size = static_cast<int>(entry.size());
+        width = (width < size ? size : width);
     }
 
     /**
@@ -254,10 +254,11 @@ public:
     static
     void
     updateWidthString(std::string value,
-                      long & width)
+                      int & width)
     {
         std::string entry = value;
-        width = (width < (long) entry.size() ? entry.size() : width);
+        int size = static_cast<int>(entry.size());
+        width = (width < size ? size : width);
     }
 
 };
@@ -894,8 +895,8 @@ public:
 
         // Look up probability in cdf
         std::vector<double> dist = this->cdf();
-        int numBins = dist.size();
-        for (int i = 0; i < numBins-1; i++)
+        const long numBins = dist.size();
+        for (long i = 0; i < numBins-1; i++)
         {
             if (dist.at(i+1) == 0) continue;
             if ((dist.at(i) <= probability) && (probability <= dist.at(i+1)))
@@ -964,10 +965,10 @@ public:
      * @throws std::runtime_exception If histogram could not be initialized.
      */
     double
-    width(int const index)
+    width()
     {
         if (!this->merge()) throw std::runtime_error("DynamicHistogram::width - Histogram could not be initialized.");
-        return this->width_(index);
+        return this->width_();
     }
 
     /**
@@ -1078,8 +1079,8 @@ protected:
         // ----------------------------------------------------------------------
 
         // Compute dynamic range of histogram + cache data
-        double cacheLeft = this->bin_(this->index_(this->_cache.min())) - 0.5 * this->width_(this->index_(this->_cache.min()));
-        double cacheRight = this->bin_(this->index_(this->_cache.max())) + 0.5* this->width_(this->index_(this->_cache.max()));
+        double cacheLeft = this->bin_(this->index_(this->_cache.min())) - 0.5 * this->width_();
+        double cacheRight = this->bin_(this->index_(this->_cache.max())) + 0.5* this->width_();
         double newMin = std::min<double>(cacheLeft, this->_binMin);
         double newMax = std::max<double>(cacheRight, this->_binMax);
 
@@ -1180,7 +1181,7 @@ private:
     }
 
     double
-    width_(int const index)
+    width_()
     {
         return this->_binWidth;
     }
@@ -1505,7 +1506,7 @@ public:
     bool
     isFiltered(DataVector const & data) const
     {
-        unsigned int size = data.size();
+        unsigned long int size = data.size();
         // Iterate through and check if any filter applies to this data point
         if (this->_numericFilters.size() == 0) return true;
         for (std::vector<NumericFilterCase>::const_iterator it = this->_numericFilters.begin(); it != this->_numericFilters.end(); ++it)
@@ -1524,7 +1525,7 @@ public:
     bool
     isFiltered(std::vector<std::string> const & data) const
     {
-        unsigned int size = data.size();
+        unsigned long int size = data.size();
         // Iterate through and check if any filter applies to this data point
         if (this->_stringFilters.size() == 0) return true;
         for (std::vector<StringFilterCase>::const_iterator it = this->_stringFilters.begin(); it != this->_stringFilters.end(); ++it)
@@ -1968,7 +1969,7 @@ private:
                     value = *argument;
                 }
                 bool isInt = StringParser::toValue<unsigned int>(value, verbose);
-                if (!(isInt && verbose >= Logger::Level::FATAL && verbose <= Logger::Level::DETAIL))
+                if (!(isInt && verbose <= Logger::Level::DETAIL))
                 {
                     throw std::runtime_error("Invalid verbose level");
                 }
@@ -2749,8 +2750,9 @@ public:
             {
                 // update variance
                 // Welford increment (delta holds old mean, _mean is already new)
-                this->_variance = (this->_count-1) * this->_variance + delta * (value - this->_mean);
-                this->_variance /= this->_count;
+                double count = static_cast<double>(this->_count);
+                this->_variance = (count-1) * this->_variance + delta * (value - this->_mean);
+                this->_variance /= count;
             }
         }
 
@@ -2854,9 +2856,9 @@ public:
     getCovariance(long const i,
                   long const j) const
     {
-        const int numPoints = this->_statistics.size();
+        const long numPoints = this->_statistics.size();
         if ((i < 0) || (i >= numPoints) || (j < 0) || (j >= numPoints)) throw std::runtime_error("Invalid covariance indices");
-        int k = i * numPoints + j;
+        const long k = i * numPoints + j;
         return this->_covariance.at(k);
     }
 
@@ -3022,8 +3024,8 @@ public:
         {
 
             // Update covariance
-            const int numPoints = data.size();
-            for (int i = 0; i < numPoints; i++)
+            const long numPoints = data.size();
+            for (long i = 0; i < numPoints; i++)
             {
             
                 if (!data[i].active) continue;
@@ -3031,7 +3033,7 @@ public:
                 double meanI = this->_statistics[i].getMean();
                 double deltaI = (data[i].value - meanI);
 
-                for (int j = 0; j < numPoints; j++)
+                for (long j = 0; j < numPoints; j++)
                 {
 
                     if (!data[j].active) continue;
@@ -3040,7 +3042,7 @@ public:
                     double deltaJ = (data[j].value - meanJ);
 
                     // Update counts when both variables are active
-                    int k = i * numPoints + j;
+                    long k = i * numPoints + j;
                     this->_counts[k] += 1;
                     double N = this->_counts[k];
 
@@ -3174,7 +3176,7 @@ public:
                     MultivariateTracker & tracker)
     {
         
-        int numDim = tracker.getDimension();
+        const long numDim = tracker.getDimension();
 
         // Print no data header
         if (numDim == 0)
@@ -3213,10 +3215,10 @@ public:
                 T (MultivariateTracker::*matrix)(long const i, long const j) const)
     {
 
-        int numDim = tracker.getDimension();
+        const long numDim = tracker.getDimension();
 
         // Compute column widths
-        std::vector<long> width(numDim,0);
+        std::vector<int> width(numDim,0);
         for (long i = 0; i < numDim; i++)
         {
             StringParser::updateWidthString(tracker.getName(i), width[i]);
@@ -3229,13 +3231,13 @@ public:
             }
         }
 
-        long totalWidth = 0;
-        for (std::vector<long>::iterator it = width.begin(); it != width.end(); ++it)
+        int totalWidth = 0;
+        for (std::vector<int>::iterator it = width.begin(); it != width.end(); ++it)
         {
             (*it) += 3;
             totalWidth += *it;
         }
-        totalWidth = std::max<long>(totalWidth, 20);
+        totalWidth = std::max<int>(totalWidth, 20);
 
         // Print data headers
         std::string header(totalWidth,'='); 
@@ -3283,10 +3285,10 @@ public:
                     MultivariateTracker & tracker)
     {
 
-        int numDim = tracker.getDimension();
+        const long numDim = tracker.getDimension();
     
         // Compute column widths
-        std::vector<long> width(6,0);
+        std::vector<int> width(6,0);
         StringParser::updateWidthString("Dimension", width[0]);
         StringParser::updateWidthString("Count", width[1]);
         StringParser::updateWidthString("Minimum", width[2]);
@@ -3303,8 +3305,8 @@ public:
             StringParser::updateWidthString(StringParser::parseStatistic<double>(tracker.getCount(i), sqrt(tracker.getVariance(i))), width[5]);
         }
 
-        long totalWidth = 0;
-        for (std::vector<long>::iterator it = width.begin(); it != width.end(); ++it)
+        int totalWidth = 0;
+        for (std::vector<int>::iterator it = width.begin(); it != width.end(); ++it)
         {
             (*it) += 3;
             totalWidth += *it;
@@ -3367,7 +3369,7 @@ public:
             std::vector<double> cdf;
 
             // Compute column widths
-            std::vector<long> width(6,0);
+            std::vector<int> width(6,0);
             StringParser::updateWidthString("Bin Min", width[0]);
             StringParser::updateWidthString("Bin Max", width[1]);
             StringParser::updateWidthString("Center", width[2]);
@@ -3382,15 +3384,15 @@ public:
             for (unsigned int i = 0; i < nBins; i++)
             {
                 StringParser::updateWidthNumber<long>(i, width[0]);
-                StringParser::updateWidthNumber<double>(histogram.bin(i)-histogram.width(i)/2, width[1]);
-                StringParser::updateWidthNumber<double>(histogram.bin(i)+histogram.width(i)/2, width[2]);
+                StringParser::updateWidthNumber<double>(histogram.bin(i)-histogram.width()/2, width[1]);
+                StringParser::updateWidthNumber<double>(histogram.bin(i)+histogram.width()/2, width[2]);
                 StringParser::updateWidthNumber<long long>((long long)freq.at(i), width[3]);
                 StringParser::updateWidthNumber<double>(pdf.at(i), width[4]);
                 StringParser::updateWidthNumber<double>(cdf.at(i), width[5]);
             }
 
-            long totalWidth = 0;
-            for (std::vector<long>::iterator it = width.begin(); it != width.end(); ++it)
+            int totalWidth = 0;
+            for (std::vector<int>::iterator it = width.begin(); it != width.end(); ++it)
             {
                 (*it) += 3;
                 totalWidth += *it;
@@ -3417,8 +3419,8 @@ public:
             {
                 stream << indent;
                 stream << std::right << std::setw(width[0]) << StringParser::parseNumber<long>(i);
-                stream << std::right << std::setw(width[1]) << StringParser::parseNumber<double>(histogram.bin(i)-histogram.width(i)/2);
-                stream << std::right << std::setw(width[2]) << StringParser::parseNumber<double>(histogram.bin(i)+histogram.width(i)/2);
+                stream << std::right << std::setw(width[1]) << StringParser::parseNumber<double>(histogram.bin(i)-histogram.width()/2);
+                stream << std::right << std::setw(width[2]) << StringParser::parseNumber<double>(histogram.bin(i)+histogram.width()/2);
                 stream << std::right << std::setw(width[3]) << StringParser::parseNumber<long long>((long long)freq.at(i));
                 stream << std::right << std::setw(width[4]) << StringParser::parseNumber<double>(pdf.at(i));
                 stream << std::right << std::setw(width[5]) << StringParser::parseNumber<double>(cdf.at(i));
@@ -3455,8 +3457,8 @@ public:
     RowSampler(SamplerOptions const & options) :
         _count(0),
         _next(1),
-        _sampled(0),
         _mode(options.mode),
+        _sampled(0),
         _step(options.step)
     {
     }
