@@ -253,7 +253,7 @@ public:
      */
     static
     void
-    updateWidthString(std::string value,
+    updateWidthString(std::string const & value,
                       int & width)
     {
         std::string entry = value;
@@ -417,7 +417,7 @@ public:
     bool
     toIntegers(std::string const & src,
                std::vector<int> & dst,
-               std::string delim = ":")
+               std::string const & delim = ":")
     {
     
         int start = 0;
@@ -938,7 +938,7 @@ public:
         for (std::vector<double>::const_iterator freq = this->_frequencies.begin(); freq != this->_frequencies.end(); ++freq)
         {
             *dist = (*freq) / sum;
-            dist++;
+            ++dist;
         }
 
         return prob;
@@ -1442,7 +1442,7 @@ private:
 
     struct NumericFilterCase
     {
-        NumericFilterCase(unsigned int index, NumericFilter filter) : index(index), filter(filter)
+        NumericFilterCase(unsigned int index, NumericFilter const & filter) : index(index), filter(filter)
         {
         }
         unsigned int index;
@@ -1451,7 +1451,7 @@ private:
 
     struct StringFilterCase
     {
-        StringFilterCase(unsigned int index, StringFilter filter) : index(index), filter(filter)
+        StringFilterCase(unsigned int index, StringFilter const & filter) : index(index), filter(filter)
         {
         }
         unsigned int index;
@@ -2583,7 +2583,7 @@ public:
      * @param[in] variance Initial data variance
      * @param[in] options Statistics options
      */
-    StatisticsTracker(std::string name = "",
+    StatisticsTracker(std::string const & name = "",
                       long count = 0,
                       double minimum = 0,
                       double mean = 0,
@@ -2993,7 +2993,7 @@ public:
      */
     void
     setName(long const index,
-            std::string name)
+            std::string const & name)
     {
         this->_statistics[index].setName(name);
     }
@@ -3126,7 +3126,7 @@ public:
      * @brief Static class to write various statistics to a stream.
      * @param[in] comment Character used to comment header rows. Default "#".
      */
-    StatisticsWriter(std::string comment = "#") :
+    StatisticsWriter(std::string const & comment = "#") :
         _comment(comment)
     {
     }
@@ -3140,7 +3140,7 @@ public:
     void
     writeData(std::ostream & stream,
               DataVector const & data,
-              std::string const delimiter = " ")
+              std::string const & delimiter = " ")
     {
 
         for (DataVector::const_iterator it = data.begin(); it != data.end();)
