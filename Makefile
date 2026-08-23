@@ -18,3 +18,9 @@ clistatstest: test/clistatstest.cpp
 # Removed clistats executable
 clean:
 	$(RM) $(RMFLAGS) clistats clistatstest
+
+# Run static analysis
+analysis:
+	cppcheck --enable=warning,performance,portability --std=c++17 src/clistats.cpp
+
+.PHONY: analysis
