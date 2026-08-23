@@ -165,7 +165,7 @@ public:
     std::string
     parseStatistic(long count,
                    T value,
-                   std::string nan = "nan",
+                   std::string const & nan = "nan",
                    bool isScientific = false)
     {
         if (count <= 0) return nan;
