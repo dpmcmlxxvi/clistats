@@ -31,7 +31,7 @@
     {                                               \
         try                                         \
         {                                           \
-            condition;                              \
+            (void)(condition);                      \
             ASSERT(false, message);                 \
         }                                           \
         catch (...)                                 \
@@ -833,7 +833,7 @@ main()
     // ======================================================================
     // Define test metrics
     // ----------------------------------------------------------------------
-    unsigned long numTestsTotal = tests.size();
+    unsigned long numTestsTotal = static_cast<unsigned long>(tests.size());
     unsigned long numTestsPass = 0;
     unsigned long numTestsFail = 0;
 

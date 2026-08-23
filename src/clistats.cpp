@@ -723,7 +723,7 @@ public:
      * @throws std::runtime_exception If histogram could not be initialized.
      */
     double
-    bin(int const index)
+    bin(long const index)
     {
         if (!this->merge()) throw std::runtime_error("DynamicHistogram::bin - Histogram could not be initialized.");
         return this->bin_(index);
@@ -895,7 +895,7 @@ public:
 
         // Look up probability in cdf
         std::vector<double> dist = this->cdf();
-        const long numBins = dist.size();
+        const long numBins = static_cast<long>(dist.size());
         for (long i = 0; i < numBins-1; i++)
         {
             if (dist.at(i+1) == 0) continue;
@@ -1147,9 +1147,9 @@ private:
     }
     
     double
-    bin_(int const index)
+    bin_(long const index)
     {
-        return this->_binMin + this->_binWidth * (index + 0.5);
+        return this->_binMin + this->_binWidth * (static_cast<double>(index) + 0.5);
     }
     
     bool
@@ -1506,7 +1506,7 @@ public:
     bool
     isFiltered(DataVector const & data) const
     {
-        unsigned long int size = data.size();
+        unsigned long int size = static_cast<unsigned long int>(data.size());
         // Iterate through and check if any filter applies to this data point
         if (this->_numericFilters.size() == 0) return true;
         for (std::vector<NumericFilterCase>::const_iterator it = this->_numericFilters.begin(); it != this->_numericFilters.end(); ++it)
@@ -1525,7 +1525,7 @@ public:
     bool
     isFiltered(std::vector<std::string> const & data) const
     {
-        unsigned long int size = data.size();
+        unsigned long int size = static_cast<unsigned long int>(data.size());
         // Iterate through and check if any filter applies to this data point
         if (this->_stringFilters.size() == 0) return true;
         for (std::vector<StringFilterCase>::const_iterator it = this->_stringFilters.begin(); it != this->_stringFilters.end(); ++it)
@@ -2856,7 +2856,7 @@ public:
     getCovariance(long const i,
                   long const j) const
     {
-        const long numPoints = this->_statistics.size();
+        const long numPoints = static_cast<long>(this->_statistics.size());
         if ((i < 0) || (i >= numPoints) || (j < 0) || (j >= numPoints)) throw std::runtime_error("Invalid covariance indices");
         const long k = i * numPoints + j;
         return this->_covariance.at(k);
@@ -3017,14 +3017,14 @@ public:
         if (this->_statistics.size() == 0)
         {
             if (data.size() == 0) return false;
-            this->initialize(data.size(), this->_options);
+            this->initialize(static_cast<long>(data.size()), this->_options);
         }
 
         if (this->_options.doCov)
         {
 
             // Update covariance
-            const long numPoints = data.size();
+            const long numPoints = static_cast<long>(data.size());
             for (long i = 0; i < numPoints; i++)
             {
             

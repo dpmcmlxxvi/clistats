@@ -7,7 +7,9 @@ ENDIF(NOT DEFINED CMAKE_INSTALL_PREFIX)
 
 PROJECT(clistats)
 
-SET(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+IF(NOT MSVC)
+    SET(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+ENDIF(NOT MSVC)
 
 # Statically link the C runtime on Windows builds
 IF(MSVC)
