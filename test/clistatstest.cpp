@@ -544,6 +544,180 @@ void test_rowsampler_random()
 }
 
 /**
+ * Test DynamicHistogram with all identical values (degenerate range)
+ * Robustness: must initialize and report counts without throw/empty histogram
+ */
+void test_dynamichistogram_degenerate()
+{
+
+    DynamicHistogramOptions options;
+    options.enabled = true;
+    options.binCount = 10;
+    options.cacheSize = 8;
+
+    DynamicHistogram<double> histogram(options);
+
+    // Fill cache with identical values (triggers zero-range init on merge)
+    for (int i = 0; i < options.cacheSize; i++)
+    {
+        histogram.add(0.0);
+    }
+
+    // Force merge / materialize histogram
+    double total = histogram.total();
+    ASSERT(total > 0, "DynamicHistogram degenerate: total should be > 0 after identical values");
+    ASSERT_EQUAL(histogram.count(), options.binCount, "DynamicHistogram degenerate: bin count mismatch");
+
+    // All mass should be present (sum of frequencies)
+    std::vector<double> freq = histogram.frequencies();
+    double sum = 0;
+    for (std::vector<double>::size_type i = 0; i < freq.size(); i++)
+    {
+        sum += freq.at(i);
+    }
+    ASSERT_EQUAL(sum, (double) options.cacheSize, "DynamicHistogram degenerate: frequency sum should equal number of added points");
+
+}
+
+/**
+ * Test DynamicHistogram expansion after degenerate init (zeros then a distant value)
+ * Robustness: merge expansion must not throw on large range jump
+ */
+void test_dynamichistogram_expand_after_degenerate()
+{
+
+    DynamicHistogramOptions options;
+    options.enabled = true;
+    options.binCount = 10;
+    options.cacheSize = 4;
+
+    DynamicHistogram<double> histogram(options);
+
+    for (int i = 0; i < options.cacheSize; i++)
+    {
+        histogram.add(0.0);
+    }
+
+    // Force initial merge on identical values
+    ASSERT(histogram.total() > 0, "DynamicHistogram expand: expected positive total after zeros");
+
+    // Distant value should expand histogram without throwing
+    histogram.add(1.0);
+    histogram.add(100.0);
+
+    double total = histogram.total();
+    ASSERT(total >= (double)(options.cacheSize + 2), "DynamicHistogram expand: total should include zeros and new points");
+
+    // Accessors must remain usable
+    std::vector<double> freq = histogram.frequencies();
+    ASSERT_EQUAL((int) freq.size(), options.binCount, "DynamicHistogram expand: frequency vector size mismatch");
+
+}
+
+/**
+ * Test MultivariateTracker covariance/correlation with inactive columns
+ * Robustness: inactive entries must not corrupt covariance or throw
+ */
+void test_multivariatetracker_inactive()
+{
+
+    StatisticsTrackerOptions options;
+    options.doCov = options.doMax = options.doMean = options.doMin = options.doVar = true;
+    MultivariateTracker tracker(2, options);
+
+    DataVector row1;
+    row1.push_back(DataPoint(1.0, true));
+    row1.push_back(DataPoint(2.0, false));  // inactive
+
+    DataVector row2;
+    row2.push_back(DataPoint(3.0, true));
+    row2.push_back(DataPoint(4.0, true));
+
+    DataVector row3;
+    row3.push_back(DataPoint(5.0, true));
+    row3.push_back(DataPoint(6.0, true));
+
+    ASSERT(tracker.update(row1), "MultivariateTracker inactive: update row1 failed");
+    ASSERT(tracker.update(row2), "MultivariateTracker inactive: update row2 failed");
+    ASSERT(tracker.update(row3), "MultivariateTracker inactive: update row3 failed");
+
+    // Column 0 saw 3 values; column 1 saw 2 (first inactive)
+    ASSERT_EQUAL(tracker.getCount(0), 3, "MultivariateTracker inactive: count column 0");
+    ASSERT_EQUAL(tracker.getCount(1), 2, "MultivariateTracker inactive: count column 1");
+
+    // Covariance diagonal should be finite and non-negative
+    double v0 = tracker.getCovariance(0, 0);
+    double v1 = tracker.getCovariance(1, 1);
+    ASSERT(v0 >= 0.0, "MultivariateTracker inactive: variance(0,0) should be >= 0");
+    ASSERT(v1 >= 0.0, "MultivariateTracker inactive: variance(1,1) should be >= 0");
+
+    // Correlation must not NaN when variances are positive
+    double corr = tracker.getCorrelation(0, 1);
+    ASSERT(corr == corr, "MultivariateTracker inactive: correlation should not be NaN");
+    ASSERT(corr >= -1.0 && corr <= 1.0, "MultivariateTracker inactive: correlation out of [-1,1]");
+
+}
+
+/**
+ * Test correlation when a column has zero variance
+ * Robustness: must not return NaN
+ */
+void test_multivariatetracker_zero_variance_correlation()
+{
+
+    StatisticsTrackerOptions options;
+    options.doCov = options.doMax = options.doMean = options.doMin = options.doVar = true;
+    MultivariateTracker tracker(2, options);
+
+    DataVector row1;
+    row1.push_back(DataPoint(1.0, true));
+    row1.push_back(DataPoint(7.0, true));
+
+    DataVector row2;
+    row2.push_back(DataPoint(2.0, true));
+    row2.push_back(DataPoint(7.0, true));  // constant column
+
+    DataVector row3;
+    row3.push_back(DataPoint(3.0, true));
+    row3.push_back(DataPoint(7.0, true));
+
+    tracker.update(row1);
+    tracker.update(row2);
+    tracker.update(row3);
+
+    double corr = tracker.getCorrelation(0, 1);
+    ASSERT(corr == corr, "MultivariateTracker zero-variance: correlation should not be NaN");
+    ASSERT_EQUAL(corr, 0.0, "MultivariateTracker zero-variance: correlation should be 0");
+
+}
+
+/**
+ * Test StringSplitter::toIntegers range and single values used by column filters
+ * Robustness: invalid ranges must fail cleanly; valid ranges must expand
+ */
+void test_stringsplitter_tointegers_filter_edges()
+{
+
+    std::vector<int> range;
+
+    range.clear();
+    ASSERT(StringSplitter::toIntegers("3:5", range), "toIntegers filter edges: valid range 3:5 should parse");
+    ASSERT_EQUAL((int) range.size(), 3, "toIntegers filter edges: 3:5 size");
+    ASSERT_EQUAL(range.at(0), 3, "toIntegers filter edges: 3:5 start");
+    ASSERT_EQUAL(range.at(2), 5, "toIntegers filter edges: 3:5 end");
+
+    range.clear();
+    ASSERT(StringSplitter::toIntegers("2", range), "toIntegers filter edges: single value should parse");
+    ASSERT_EQUAL((int) range.size(), 1, "toIntegers filter edges: single size");
+    ASSERT_EQUAL(range.at(0), 2, "toIntegers filter edges: single value");
+
+    range.clear();
+    ASSERT(!StringSplitter::toIntegers("a:b", range), "toIntegers filter edges: non-numeric should fail");
+    ASSERT(!StringSplitter::toIntegers("1:2:3", range), "toIntegers filter edges: too many tokens should fail");
+
+}
+
+/**
  * Unit tester for clistats
  */
 int
@@ -569,10 +743,15 @@ main(int argc,
     tests.push_back(test_fixedsizecache);
     tests.push_back(test_dynamichistogram_disabled);
     tests.push_back(test_dynamichistogram_enabled);
+    tests.push_back(test_dynamichistogram_degenerate);
+    tests.push_back(test_dynamichistogram_expand_after_degenerate);
     tests.push_back(test_datavector);
     tests.push_back(test_datafilters);
     tests.push_back(test_statisticstracker);
     tests.push_back(test_multivariatetracker);
+    tests.push_back(test_multivariatetracker_inactive);
+    tests.push_back(test_multivariatetracker_zero_variance_correlation);
+    tests.push_back(test_stringsplitter_tointegers_filter_edges);
     tests.push_back(test_rowsampler_uniform);
     tests.push_back(test_rowsampler_random);
 

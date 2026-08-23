@@ -3028,7 +3028,6 @@ public:
             
                 if (!data[i].active) continue;
 
-                int countI = this->_statistics[i].getCount();
                 double meanI = this->_statistics[i].getMean();
                 double deltaI = (data[i].value - meanI);
 
@@ -3037,14 +3036,14 @@ public:
 
                     if (!data[j].active) continue;
                 
-                    int countJ = this->_statistics[j].getCount();
                     double meanJ = this->_statistics[j].getMean();
                     double deltaJ = (data[j].value - meanJ);
 
-                    // Conservative estimate the number of data points
-                    double N = std::max<double>(countI+1, countJ+1);
-
+                    // Update counts when both variables are active
                     int k = i * numPoints + j;
+                    this->_counts[k] += 1;
+                    double N = this->_counts[k];
+
                     this->_covariance[k] *= (N-1);
                     this->_covariance[k] += ((N-1)/N) * (deltaI) * (deltaJ);
                     this->_covariance[k] /= N;
@@ -3084,10 +3083,16 @@ private:
         }
         
         // Initialize multivariate statistics
+        this->_counts.resize(size*size,0);
         this->_covariance.resize(size*size,0);
     }
 
 protected:
+
+    /**
+     * Multivariate statistics counts
+     */
+    std::vector<double> _counts;
 
     /**
      * Multivariate statistics
