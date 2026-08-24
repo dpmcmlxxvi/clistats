@@ -2,7 +2,6 @@ clistats
 ================================================================================
 
 ![CI](https://github.com/dpmcmlxxvi/clistats/actions/workflows/ci.yml/badge.svg)
-
 [![codecov](https://codecov.io/github/dpmcmlxxvi/clistats/graph/badge.svg?token=SjEBePrZ5m)](https://codecov.io/github/dpmcmlxxvi/clistats)
 
 clistats is a command line interface tool to compute statistics of a set
