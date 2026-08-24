@@ -715,6 +715,354 @@ void test_stringsplitter_tointegers_filter_edges()
 }
 
 /**
+ * Build a mutable argument array from a list of strings for CommandLineParser tests
+ * @param[in] args Argument values, args.at(0) is treated as the executable name
+ * @return Vector of char pointers into args suitable for use as argv
+ */
+std::vector<char *>
+buildArgs(std::vector<std::string> & args)
+{
+    std::vector<char *> argv;
+    for (std::vector<std::string>::iterator it = args.begin(); it != args.end(); ++it)
+    {
+        argv.push_back(&(*it)[0]);
+    }
+    return argv;
+}
+
+/**
+ * Test CommandLineParser input/output/format flags
+ */
+void test_commandlineparser_flags_io()
+{
+
+    std::string fileInput = "test_commandlineparser_flags_io_input.csv";
+    std::string fileOutput = "test_commandlineparser_flags_io_output.csv";
+    std::ofstream input(fileInput.c_str());
+    input << "1,2" << std::endl;
+    input.close();
+
+    std::vector<std::string> args;
+    args.push_back("clistats");
+    args.push_back("-i"); args.push_back(fileInput);
+    args.push_back("-o"); args.push_back(fileOutput);
+    args.push_back("-d"); args.push_back(";");
+    args.push_back("-c"); args.push_back("#");
+    args.push_back("-a"); args.push_back("44");
+    args.push_back("-b");
+    args.push_back("-s"); args.push_back("2");
+    args.push_back("-k"); args.push_back("5");
+    args.push_back("-r");
+    args.push_back("-t"); args.push_back("1");
+    std::vector<char *> argv = buildArgs(args);
+
+    CommandLineParser parser((int) argv.size(), &argv[0]);
+
+    ASSERT_EQUAL(parser.options.fileInput, fileInput, "CommandLineParser -i failed to set input file");
+    ASSERT_EQUAL(parser.options.fileOutput, fileOutput, "CommandLineParser -o failed to set output file");
+    ASSERT_EQUAL(parser.options.delimiter, ";,", "CommandLineParser -d/-a failed to append delimiter characters");
+    ASSERT_EQUAL(parser.options.comment, "#", "CommandLineParser -c failed to set comment character");
+    ASSERT(parser.options.blankEOF, "CommandLineParser -b failed to set blank EOF flag");
+    ASSERT_EQUAL(parser.options.numLinesToSkip, (unsigned int) 2, "CommandLineParser -s failed to set number of lines to skip");
+    ASSERT_EQUAL(parser.options.numLinesToKeep, (unsigned int) 5, "CommandLineParser -k failed to set number of lines to keep");
+    ASSERT(parser.options.removeDuplicates, "CommandLineParser -r failed to set remove duplicates flag");
+    ASSERT_EQUAL(parser.options.headerRow, (unsigned int) 1, "CommandLineParser -t failed to set header row");
+
+    std::remove(fileInput.c_str());
+    std::remove(fileOutput.c_str());
+
+}
+
+/**
+ * Test CommandLineParser column and row filter flags
+ */
+void test_commandlineparser_flags_filters()
+{
+
+    std::vector<std::string> args;
+    args.push_back("clistats");
+    args.push_back("-fc"); args.push_back("1,3");
+    args.push_back("-fn"); args.push_back("2,0,10");
+    args.push_back("-fs"); args.push_back("4,abc");
+    std::vector<char *> argv = buildArgs(args);
+
+    CommandLineParser parser((int) argv.size(), &argv[0]);
+
+    ASSERT(parser.options.filterColumns.at(0), "CommandLineParser -fc failed to enable column 1");
+    ASSERT(!parser.options.filterColumns.at(1), "CommandLineParser -fc failed to leave column 2 disabled");
+    ASSERT(parser.options.filterColumns.at(2), "CommandLineParser -fc failed to enable column 3");
+
+}
+
+/**
+ * Test CommandLineParser sampling and parsing mode flags
+ */
+void test_commandlineparser_flags_sampling()
+{
+
+    std::vector<std::string> args;
+    args.push_back("clistats");
+    args.push_back("-rs"); args.push_back("2");
+    args.push_back("-se"); args.push_back("7");
+    args.push_back("-su"); args.push_back("3");
+    args.push_back("-st");
+    std::vector<char *> argv = buildArgs(args);
+
+    CommandLineParser parser((int) argv.size(), &argv[0]);
+
+    ASSERT_EQUAL(parser.options.numLinesToReshape, (unsigned int) 2, "CommandLineParser -rs failed to set reshape count");
+    ASSERT_EQUAL(parser.options.seed, (unsigned int) 7, "CommandLineParser -se failed to set seed");
+    ASSERT_EQUAL(parser.options.sampling.mode, SamplerOptions::UNIFORM, "CommandLineParser -su failed to set uniform sampling mode");
+    ASSERT_EQUAL(parser.options.sampling.step, (unsigned int) 3, "CommandLineParser -su failed to set sampling step");
+    ASSERT(parser.options.strictParsing, "CommandLineParser -st failed to set strict parsing flag");
+
+    std::vector<std::string> argsRandom;
+    argsRandom.push_back("clistats");
+    argsRandom.push_back("-sr"); argsRandom.push_back("5");
+    std::vector<char *> argvRandom = buildArgs(argsRandom);
+
+    CommandLineParser parserRandom((int) argvRandom.size(), &argvRandom[0]);
+    ASSERT_EQUAL(parserRandom.options.sampling.mode, SamplerOptions::RANDOM, "CommandLineParser -sr failed to set random sampling mode");
+    ASSERT_EQUAL(parserRandom.options.sampling.step, (unsigned int) 5, "CommandLineParser -sr failed to set sampling step");
+
+}
+
+/**
+ * Test CommandLineParser output selection flags
+ */
+void test_commandlineparser_flags_output()
+{
+
+    std::vector<std::string> args;
+    args.push_back("clistats");
+    args.push_back("-v"); args.push_back("2");
+    args.push_back("-cv");
+    args.push_back("-cr");
+    args.push_back("-fd");
+    args.push_back("-hg"); args.push_back("5,200");
+    args.push_back("-lo");
+    args.push_back("-ls");
+    args.push_back("-ss");
+    std::vector<char *> argv = buildArgs(args);
+
+    CommandLineParser parser((int) argv.size(), &argv[0]);
+
+    ASSERT_EQUAL((int) parser.options.verboseLevel, 2, "CommandLineParser -v failed to set verbose level");
+    ASSERT(parser.options.showCovariance, "CommandLineParser -cv failed to set covariance flag");
+    ASSERT(parser.options.showCorrelation, "CommandLineParser -cr failed to set correlation flag");
+    ASSERT(parser.options.showFilteredData, "CommandLineParser -fd failed to set filtered data flag");
+    ASSERT(parser.options.showHistogram, "CommandLineParser -hg failed to set histogram flag");
+    ASSERT_EQUAL(parser.options.statisticsOptions.histogramOptions.binCount, 5, "CommandLineParser -hg failed to set bin count");
+    ASSERT_EQUAL(parser.options.statisticsOptions.histogramOptions.cacheSize, 200, "CommandLineParser -hg failed to set cache size");
+    ASSERT(parser.options.showLeastSquaresOffset, "CommandLineParser -lo failed to set least squares offset flag");
+    ASSERT(parser.options.showLeastSquaresSlope, "CommandLineParser -ls failed to set least squares slope flag");
+    ASSERT(parser.options.showStatistics, "CommandLineParser -ss failed to set statistics flag");
+
+}
+
+/**
+ * Test CommandLineParser help and version flags
+ */
+void test_commandlineparser_help_version()
+{
+
+    std::vector<std::string> argsHelp;
+    argsHelp.push_back("clistats");
+    argsHelp.push_back("-h");
+    std::vector<char *> argvHelp = buildArgs(argsHelp);
+
+    CommandLineParser parserHelp((int) argvHelp.size(), &argvHelp[0]);
+    ASSERT(parserHelp.showUsage(), "CommandLineParser -h failed to set usage flag");
+
+    std::vector<std::string> argsVersion;
+    argsVersion.push_back("clistats");
+    argsVersion.push_back("-V");
+    std::vector<char *> argvVersion = buildArgs(argsVersion);
+
+    CommandLineParser parserVersion((int) argvVersion.size(), &argvVersion[0]);
+    ASSERT(parserVersion.showVersion(), "CommandLineParser -V failed to set version flag");
+
+    std::ostringstream usage;
+    std::streambuf * oldUsageBuf = std::cout.rdbuf(usage.rdbuf());
+    CommandLineParser::printUsage();
+    std::cout.rdbuf(oldUsageBuf);
+    ASSERT(usage.str().find("SYNOPSIS") != std::string::npos, "CommandLineParser::printUsage failed to print usage text");
+
+    std::ostringstream version;
+    std::streambuf * oldVersionBuf = std::cout.rdbuf(version.rdbuf());
+    CommandLineParser::printVersion();
+    std::cout.rdbuf(oldVersionBuf);
+    ASSERT_EQUAL(version.str(), ApplicationProperties::version() + "\n", "CommandLineParser::printVersion failed to print version text");
+
+}
+
+/**
+ * Test CommandLineParser rejects unrecognized and invalid flag values
+ */
+void test_commandlineparser_invalid()
+{
+
+    std::vector<std::string> argsUnknown;
+    argsUnknown.push_back("clistats");
+    argsUnknown.push_back("--bogus");
+    std::vector<char *> argvUnknown = buildArgs(argsUnknown);
+    ASSERT_EXCEPTION(CommandLineParser(((int) argvUnknown.size()), &argvUnknown[0]), "CommandLineParser failed to reject unrecognized flag");
+
+    std::vector<std::string> argsBadVerbose;
+    argsBadVerbose.push_back("clistats");
+    argsBadVerbose.push_back("-v"); argsBadVerbose.push_back("99");
+    std::vector<char *> argvBadVerbose = buildArgs(argsBadVerbose);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvBadVerbose.size(), &argvBadVerbose[0]), "CommandLineParser failed to reject invalid verbose level");
+
+    std::vector<std::string> argsBadInput;
+    argsBadInput.push_back("clistats");
+    argsBadInput.push_back("-i"); argsBadInput.push_back("does_not_exist.csv");
+    std::vector<char *> argvBadInput = buildArgs(argsBadInput);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvBadInput.size(), &argvBadInput[0]), "CommandLineParser failed to reject missing input file");
+
+    std::vector<std::string> argsSameDelimiterComment;
+    argsSameDelimiterComment.push_back("clistats");
+    argsSameDelimiterComment.push_back("-d"); argsSameDelimiterComment.push_back("#");
+    argsSameDelimiterComment.push_back("-c"); argsSameDelimiterComment.push_back("#");
+    std::vector<char *> argvSameDelimiterComment = buildArgs(argsSameDelimiterComment);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvSameDelimiterComment.size(), &argvSameDelimiterComment[0]), "CommandLineParser failed to reject matching delimiter and comment");
+
+}
+
+/**
+ * Test program driver flag parsing, run, and display paths
+ */
+void test_pdrv()
+{
+
+    std::string fileInput = "test_pdrv_input.csv";
+    std::ofstream input(fileInput.c_str());
+    input << "1,2" << std::endl;
+    input << "3,4" << std::endl;
+    input.close();
+
+    std::string fileOutput = "test_pdrv_output.csv";
+    std::vector<std::string> argsSuccess;
+    argsSuccess.push_back("clistats");
+    argsSuccess.push_back("-i"); argsSuccess.push_back(fileInput);
+    argsSuccess.push_back("-o"); argsSuccess.push_back(fileOutput);
+    argsSuccess.push_back("-d"); argsSuccess.push_back(",");
+    std::vector<char *> argvSuccess = buildArgs(argsSuccess);
+    ASSERT_EQUAL(pdrv((int) argvSuccess.size(), &argvSuccess[0]), (int) AppStatus::SUCCESS, "pdrv failed on valid input");
+    std::remove(fileOutput.c_str());
+
+    std::vector<std::string> argsHelp;
+    argsHelp.push_back("clistats");
+    argsHelp.push_back("-h");
+    std::vector<char *> argvHelp = buildArgs(argsHelp);
+    std::ostringstream usage;
+    std::streambuf * oldUsageBuf = std::cout.rdbuf(usage.rdbuf());
+    int statusHelp = pdrv((int) argvHelp.size(), &argvHelp[0]);
+    std::cout.rdbuf(oldUsageBuf);
+    ASSERT_EQUAL(statusHelp, (int) AppStatus::SUCCESS, "pdrv failed on -h flag");
+    ASSERT(usage.str().find("SYNOPSIS") != std::string::npos, "pdrv failed to print usage on -h flag");
+
+    std::vector<std::string> argsVersion;
+    argsVersion.push_back("clistats");
+    argsVersion.push_back("-V");
+    std::vector<char *> argvVersion = buildArgs(argsVersion);
+    std::ostringstream version;
+    std::streambuf * oldVersionBuf = std::cout.rdbuf(version.rdbuf());
+    int statusVersion = pdrv((int) argvVersion.size(), &argvVersion[0]);
+    std::cout.rdbuf(oldVersionBuf);
+    ASSERT_EQUAL(statusVersion, (int) AppStatus::SUCCESS, "pdrv failed on -V flag");
+    ASSERT_EQUAL(version.str(), ApplicationProperties::version() + "\n", "pdrv failed to print version on -V flag");
+
+    std::vector<std::string> argsBad;
+    argsBad.push_back("clistats");
+    argsBad.push_back("--bogus");
+    std::vector<char *> argvBad = buildArgs(argsBad);
+    std::ostringstream fatal;
+    std::streambuf * oldCerrBuf = std::cerr.rdbuf(fatal.rdbuf());
+    int statusBad = pdrv((int) argvBad.size(), &argvBad[0]);
+    std::cerr.rdbuf(oldCerrBuf);
+    ASSERT_EQUAL(statusBad, (int) AppStatus::FAILED_PARSING, "pdrv failed to report parsing failure on unrecognized flag");
+
+    std::remove(fileInput.c_str());
+
+}
+
+/**
+ * Test DynamicHistogram order statistic interpolation
+ */
+void test_dynamichistogram_order()
+{
+
+    DynamicHistogramOptions options;
+    options.enabled = true;
+    options.binCount = 4;
+    options.cacheSize = 4;
+
+    DynamicHistogram<double> histogram(options);
+    histogram.add(0.0);
+    histogram.add(1.0);
+    histogram.add(2.0);
+    histogram.add(4.0);
+
+    ASSERT_EQUAL(histogram.order(0), histogram.bin(0), "DynamicHistogram::order failed on lower probability bound");
+    ASSERT_EQUAL(histogram.order((int) histogram.total()), histogram.bin(3), "DynamicHistogram::order failed on upper probability bound");
+
+    double interpolated = histogram.order(2);
+    ASSERT(interpolated >= histogram.bin(0) && interpolated <= histogram.bin(3), "DynamicHistogram::order failed to interpolate within histogram range");
+
+}
+
+/**
+ * Test StatisticsWriter matrix, histogram, and data output
+ */
+void test_statisticswriter_output()
+{
+
+    DataVector data1, data2;
+    data1.push_back(DataPoint(1,true));
+    data1.push_back(DataPoint(3,true));
+    data2.push_back(DataPoint(2,true));
+    data2.push_back(DataPoint(2,true));
+
+    StatisticsTrackerOptions options;
+    options.doCov = options.doMax = options.doMean = options.doMin = options.doVar = true;
+    options.histogramOptions.enabled = true;
+    options.histogramOptions.binCount = 2;
+    options.histogramOptions.cacheSize = 2;
+    MultivariateTracker tracker(2, options);
+    tracker.update(data1);
+    tracker.update(data2);
+
+    StatisticsWriter writer;
+
+    std::ostringstream matrix;
+    writer.writeMatrix<double>(matrix, tracker, "Covariance", &MultivariateTracker::getCovariance);
+    ASSERT(matrix.str().find("Covariance") != std::string::npos, "StatisticsWriter::writeMatrix failed to write title");
+
+    std::ostringstream histograms;
+    writer.writeHistograms(histograms, tracker);
+    ASSERT(histograms.str().find("Histogram") != std::string::npos, "StatisticsWriter::writeHistograms failed to write histogram section");
+
+    std::ostringstream emptyHistograms;
+    MultivariateTracker emptyTracker(0, options);
+    writer.writeHistograms(emptyHistograms, emptyTracker);
+    ASSERT(emptyHistograms.str().find("No valid data") != std::string::npos, "StatisticsWriter::writeHistograms failed to report no data on empty tracker");
+
+    std::ostringstream matrixEmpty;
+    writer.writeMatrix<double>(matrixEmpty, emptyTracker, "Covariance", &MultivariateTracker::getCovariance);
+    ASSERT(matrixEmpty.str().find("No Data") != std::string::npos, "StatisticsWriter::writeMatrix failed to report no data on empty tracker");
+
+    DataVector data;
+    data.push_back(DataPoint(1,true));
+    data.push_back(DataPoint(2,false));
+    data.push_back(DataPoint(3,true));
+    std::ostringstream dataStream;
+    writer.writeData(dataStream, data, ",");
+    ASSERT_EQUAL(dataStream.str(), "1,3\n", "StatisticsWriter::writeData failed to skip inactive data points");
+
+}
+
+/**
  * Test StatisticsApp file input and output
  */
 void test_statisticsapp_fileio()
@@ -829,6 +1177,15 @@ main()
     tests.push_back(test_rowsampler_random);
     tests.push_back(test_statisticsapp_fileio);
     tests.push_back(test_statisticsapp_blankcomment);
+    tests.push_back(test_commandlineparser_flags_io);
+    tests.push_back(test_commandlineparser_flags_filters);
+    tests.push_back(test_commandlineparser_flags_sampling);
+    tests.push_back(test_commandlineparser_flags_output);
+    tests.push_back(test_commandlineparser_help_version);
+    tests.push_back(test_commandlineparser_invalid);
+    tests.push_back(test_pdrv);
+    tests.push_back(test_dynamichistogram_order);
+    tests.push_back(test_statisticswriter_output);
 
     // ======================================================================
     // Define test metrics

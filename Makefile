@@ -21,6 +21,6 @@ clean:
 
 # Run static analysis
 analysis:
-	cppcheck --enable=warning,performance,portability --std=c++17 src/clistats.cpp
+	cppcheck --enable=warning,performance,portability --std=c++17 src/clistats.cpp test/clistatstest.cpp
 
 .PHONY: analysis
