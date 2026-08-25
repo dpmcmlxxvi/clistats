@@ -1,4 +1,3 @@
-
 /**
  * Unit tests for clistats
  * @author Daniel Pulido <dpmcmlxxvi@gmail.com>
@@ -70,6 +69,13 @@ void test_stringparser_parsestatistic()
     ASSERT_EQUAL(StringParser::parseStatistic<float>(0,(float)1.1), "nan", "StringParser::parseStatistic<float> failed on parsing float");
     ASSERT_EQUAL(StringParser::parseStatistic<double>(0,1.1), "nan", "StringParser::parseStatistic<double> failed on parsing double");
     ASSERT_EQUAL(StringParser::parseStatistic<long double>(0,1.1), "nan", "StringParser::parseStatistic<long double> failed on parsing long double");
+
+    ASSERT_EQUAL(StringParser::parseStatistic<short>(1,1), "1", "StringParser::parseStatistic<short> failed on non-zero count");
+    ASSERT_EQUAL(StringParser::parseStatistic<int>(1,1), "1", "StringParser::parseStatistic<int> failed on non-zero count");
+    ASSERT_EQUAL(StringParser::parseStatistic<long>(1,1), "1", "StringParser::parseStatistic<long> failed on non-zero count");
+    ASSERT_EQUAL(StringParser::parseStatistic<long long>(1,1), "1", "StringParser::parseStatistic<long long> failed on non-zero count");
+    ASSERT_EQUAL(StringParser::parseStatistic<float>(1,(float)1.1), "1.100000", "StringParser::parseStatistic<float> failed on non-zero count");
+    ASSERT_EQUAL(StringParser::parseStatistic<long double>(1,1.1), "1.100000", "StringParser::parseStatistic<long double> failed on non-zero count");
 
 }
 
@@ -263,7 +269,14 @@ void test_fixedsizecache()
     ASSERT(!cache.full(), "FixedSizeCache::full failed on reset cache");
     ASSERT_EXCEPTION(cache.max(), "FixedSizeCache::max failed on reset cache");
     ASSERT_EXCEPTION(cache.min(), "FixedSizeCache::min failed on reset cache");
-    
+
+    FixedSizeCache<int> cacheMinMax(3);
+    cacheMinMax.add(3);
+    cacheMinMax.add(1);
+    cacheMinMax.add(2);
+    ASSERT_EQUAL(cacheMinMax.max(), 3, "FixedSizeCache::max failed on non-empty cache");
+    ASSERT_EQUAL(cacheMinMax.min(), 1, "FixedSizeCache::min failed on non-empty cache");
+
 }
 
 /**
@@ -434,6 +447,20 @@ void test_datafilters()
     filters.addStringFilter(1,"4",true,true,false);
     ASSERT(filters.isFiltered(datas), "DataFilters::isFiltered failed on data vector with string rejection filter on 1");
 
+    DataFilters caseFilter;
+    caseFilter.addStringFilter(0,"A",false,false,true);
+    std::vector<std::string> matched;
+    matched.push_back("abc");
+    ASSERT(caseFilter.isFiltered(matched), "DataFilters::isFiltered failed on case-insensitive partial match");
+
+    DataFilters numericMiss;
+    numericMiss.addNumericFilter(0,100,200,true);
+    ASSERT(!numericMiss.isFiltered(datav), "DataFilters::isFiltered failed to reject data vector with no matching numeric filter");
+
+    DataFilters stringMiss;
+    stringMiss.addStringFilter(0,"zzz",true,true,true);
+    ASSERT(!stringMiss.isFiltered(datas), "DataFilters::isFiltered failed to reject string vector with no matching string filter");
+
 }
 
 /**
@@ -491,6 +518,26 @@ void test_multivariatetracker()
     ASSERT_EQUAL(tracker.getCovariance(0,1), -cov, "StatisticsTracker::getCovariance failed on (0,1)");
     ASSERT_EQUAL(tracker.getCovariance(1,0), -cov, "StatisticsTracker::getCovariance failed on (1,0)");
     ASSERT_EQUAL(tracker.getCovariance(1,1), cov, "StatisticsTracker::getCovariance failed on (1,1)");
+
+    DataVector data4, data5, data6;
+    data4.push_back(DataPoint(1,true));
+    data4.push_back(DataPoint(2,true));
+    data5.push_back(DataPoint(2,true));
+    data5.push_back(DataPoint(4,true));
+    data6.push_back(DataPoint(3,true));
+    data6.push_back(DataPoint(6,true));
+
+    MultivariateTracker slopeTracker(2, options);
+    slopeTracker.update(data4);
+    slopeTracker.update(data5);
+    slopeTracker.update(data6);
+
+    ASSERT_EQUAL(slopeTracker.getLeastSquaresSlope(0,1), 2.0, "MultivariateTracker::getLeastSquaresSlope failed");
+    ASSERT_EQUAL(slopeTracker.getLeastSquaresOffset(0,1), 0.0, "MultivariateTracker::getLeastSquaresOffset failed");
+
+    DataVector mismatched;
+    mismatched.push_back(DataPoint(1,true));
+    ASSERT(!slopeTracker.update(mismatched), "MultivariateTracker::update failed to reject data with mismatched dimensions");
 
 }
 
@@ -712,6 +759,12 @@ void test_stringsplitter_tointegers_filter_edges()
     ASSERT(!StringSplitter::toIntegers("a:b", range), "toIntegers filter edges: non-numeric should fail");
     ASSERT(!StringSplitter::toIntegers("1:2:3", range), "toIntegers filter edges: too many tokens should fail");
 
+    range.clear();
+    ASSERT(StringSplitter::toIntegers("5:3", range), "toIntegers filter edges: reversed range should parse");
+    ASSERT_EQUAL((int) range.size(), 3, "toIntegers filter edges: 5:3 size");
+    ASSERT_EQUAL(range.at(0), 3, "toIntegers filter edges: 5:3 start");
+    ASSERT_EQUAL(range.at(2), 5, "toIntegers filter edges: 5:3 end");
+
 }
 
 /**
@@ -927,6 +980,207 @@ void test_commandlineparser_invalid()
     std::vector<char *> argvSameDelimiterComment = buildArgs(argsSameDelimiterComment);
     ASSERT_EXCEPTION(CommandLineParser((int) argvSameDelimiterComment.size(), &argvSameDelimiterComment[0]), "CommandLineParser failed to reject matching delimiter and comment");
 
+    std::vector<std::string> argsOutput;
+    argsOutput.push_back("clistats");
+    argsOutput.push_back("-o"); argsOutput.push_back("/no_such_directory_xyz/out.csv");
+    std::vector<char *> argvOutput = buildArgs(argsOutput);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvOutput.size(), &argvOutput[0]), "CommandLineParser failed to reject unwritable output file");
+
+    std::vector<std::string> argsAscii;
+    argsAscii.push_back("clistats");
+    argsAscii.push_back("-a"); argsAscii.push_back("200");
+    std::vector<char *> argvAscii = buildArgs(argsAscii);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvAscii.size(), &argvAscii[0]), "CommandLineParser failed to reject out-of-range ASCII code");
+
+    std::vector<std::string> argsComment;
+    argsComment.push_back("clistats");
+    argsComment.push_back("-c"); argsComment.push_back("##");
+    std::vector<char *> argvComment = buildArgs(argsComment);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvComment.size(), &argvComment[0]), "CommandLineParser failed to reject multi-character comment");
+
+    std::vector<std::string> argsSkip;
+    argsSkip.push_back("clistats");
+    argsSkip.push_back("-s"); argsSkip.push_back("-1");
+    std::vector<char *> argvSkip = buildArgs(argsSkip);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvSkip.size(), &argvSkip[0]), "CommandLineParser failed to reject negative skip count");
+
+    std::vector<std::string> argsKeep;
+    argsKeep.push_back("clistats");
+    argsKeep.push_back("-k"); argsKeep.push_back("-1");
+    std::vector<char *> argvKeep = buildArgs(argsKeep);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvKeep.size(), &argvKeep[0]), "CommandLineParser failed to reject negative keep count");
+
+    std::vector<std::string> argsTitles;
+    argsTitles.push_back("clistats");
+    argsTitles.push_back("-t"); argsTitles.push_back("0");
+    std::vector<char *> argvTitles = buildArgs(argsTitles);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvTitles.size(), &argvTitles[0]), "CommandLineParser failed to reject non-positive header row");
+
+    std::vector<std::string> argsFcBadValue;
+    argsFcBadValue.push_back("clistats");
+    argsFcBadValue.push_back("-fc"); argsFcBadValue.push_back("a");
+    std::vector<char *> argvFcBadValue = buildArgs(argsFcBadValue);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFcBadValue.size(), &argvFcBadValue[0]), "CommandLineParser failed to reject non-numeric filter column");
+
+    std::vector<std::string> argsFcZero;
+    argsFcZero.push_back("clistats");
+    argsFcZero.push_back("-fc"); argsFcZero.push_back("0");
+    std::vector<char *> argvFcZero = buildArgs(argsFcZero);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFcZero.size(), &argvFcZero[0]), "CommandLineParser failed to reject non-positive filter column");
+
+    std::vector<std::string> argsFnEmpty;
+    argsFnEmpty.push_back("clistats");
+    argsFnEmpty.push_back("-fn");
+    std::vector<char *> argvFnEmpty = buildArgs(argsFnEmpty);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFnEmpty.size(), &argvFnEmpty[0]), "CommandLineParser failed to reject empty numeric filter");
+
+    std::vector<std::string> argsFnFormat;
+    argsFnFormat.push_back("clistats");
+    argsFnFormat.push_back("-fn"); argsFnFormat.push_back("1,2");
+    std::vector<char *> argvFnFormat = buildArgs(argsFnFormat);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFnFormat.size(), &argvFnFormat[0]), "CommandLineParser failed to reject numeric filter with too few tokens");
+
+    std::vector<std::string> argsFnColumn;
+    argsFnColumn.push_back("clistats");
+    argsFnColumn.push_back("-fn"); argsFnColumn.push_back("a,0,10");
+    std::vector<char *> argvFnColumn = buildArgs(argsFnColumn);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFnColumn.size(), &argvFnColumn[0]), "CommandLineParser failed to reject non-numeric numeric filter column");
+
+    std::vector<std::string> argsFnMin;
+    argsFnMin.push_back("clistats");
+    argsFnMin.push_back("-fn"); argsFnMin.push_back("1,abc,10");
+    std::vector<char *> argvFnMin = buildArgs(argsFnMin);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFnMin.size(), &argvFnMin[0]), "CommandLineParser failed to reject non-numeric numeric filter minimum");
+
+    std::vector<std::string> argsFnMax;
+    argsFnMax.push_back("clistats");
+    argsFnMax.push_back("-fn"); argsFnMax.push_back("1,0,abc");
+    std::vector<char *> argvFnMax = buildArgs(argsFnMax);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFnMax.size(), &argvFnMax[0]), "CommandLineParser failed to reject non-numeric numeric filter maximum");
+
+    std::vector<std::string> argsFnAccept;
+    argsFnAccept.push_back("clistats");
+    argsFnAccept.push_back("-fn"); argsFnAccept.push_back("1,0,10,x");
+    std::vector<char *> argvFnAccept = buildArgs(argsFnAccept);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFnAccept.size(), &argvFnAccept[0]), "CommandLineParser failed to reject invalid numeric filter accept option");
+
+    std::vector<std::string> argsFnInf;
+    argsFnInf.push_back("clistats");
+    argsFnInf.push_back("-fn"); argsFnInf.push_back("1,-inf,inf,a");
+    std::vector<char *> argvFnInf = buildArgs(argsFnInf);
+    CommandLineParser parserFnInf((int) argvFnInf.size(), &argvFnInf[0]);
+    DataVector infData;
+    infData.push_back(DataPoint(std::numeric_limits<double>::max(),true));
+    ASSERT(parserFnInf.options.filterRows.isFiltered(infData), "CommandLineParser -fn failed to parse -inf/inf bounds and explicit accept option");
+
+    std::vector<std::string> argsFnInfReversed;
+    argsFnInfReversed.push_back("clistats");
+    argsFnInfReversed.push_back("-fn"); argsFnInfReversed.push_back("1,inf,-inf");
+    std::vector<char *> argvFnInfReversed = buildArgs(argsFnInfReversed);
+    CommandLineParser parserFnInfReversed((int) argvFnInfReversed.size(), &argvFnInfReversed[0]);
+    ASSERT(!parserFnInfReversed.options.filterRows.isFiltered(infData), "CommandLineParser -fn failed to parse inf minimum and -inf maximum bounds");
+
+    std::vector<std::string> argsFsFormat;
+    argsFsFormat.push_back("clistats");
+    argsFsFormat.push_back("-fs"); argsFsFormat.push_back("1");
+    std::vector<char *> argvFsFormat = buildArgs(argsFsFormat);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFsFormat.size(), &argvFsFormat[0]), "CommandLineParser failed to reject string filter with too few tokens");
+
+    std::vector<std::string> argsFsColumn;
+    argsFsColumn.push_back("clistats");
+    argsFsColumn.push_back("-fs"); argsFsColumn.push_back("a,pattern");
+    std::vector<char *> argvFsColumn = buildArgs(argsFsColumn);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFsColumn.size(), &argvFsColumn[0]), "CommandLineParser failed to reject non-numeric string filter column");
+
+    std::vector<std::string> argsFsMatch;
+    argsFsMatch.push_back("clistats");
+    argsFsMatch.push_back("-fs"); argsFsMatch.push_back("1,pattern,x");
+    std::vector<char *> argvFsMatch = buildArgs(argsFsMatch);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFsMatch.size(), &argvFsMatch[0]), "CommandLineParser failed to reject invalid string filter matching option");
+
+    std::vector<std::string> argsFsSensitivity;
+    argsFsSensitivity.push_back("clistats");
+    argsFsSensitivity.push_back("-fs"); argsFsSensitivity.push_back("1,pattern,e,x");
+    std::vector<char *> argvFsSensitivity = buildArgs(argsFsSensitivity);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFsSensitivity.size(), &argvFsSensitivity[0]), "CommandLineParser failed to reject invalid string filter case sensitivity option");
+
+    std::vector<std::string> argsFsAccept;
+    argsFsAccept.push_back("clistats");
+    argsFsAccept.push_back("-fs"); argsFsAccept.push_back("1,pattern,e,s,x");
+    std::vector<char *> argvFsAccept = buildArgs(argsFsAccept);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvFsAccept.size(), &argvFsAccept[0]), "CommandLineParser failed to reject invalid string filter accept option");
+
+    std::vector<std::string> argsFsExplicitAccept;
+    argsFsExplicitAccept.push_back("clistats");
+    argsFsExplicitAccept.push_back("-fs"); argsFsExplicitAccept.push_back("1,pattern,e,s,a");
+    std::vector<char *> argvFsExplicitAccept = buildArgs(argsFsExplicitAccept);
+    CommandLineParser parserFsExplicitAccept((int) argvFsExplicitAccept.size(), &argvFsExplicitAccept[0]);
+    std::vector<std::string> patternData;
+    patternData.push_back("pattern");
+    ASSERT(parserFsExplicitAccept.options.filterRows.isFiltered(patternData), "CommandLineParser -fs failed to parse explicit accept option");
+
+    std::vector<std::string> argsReshape;
+    argsReshape.push_back("clistats");
+    argsReshape.push_back("-rs"); argsReshape.push_back("0");
+    std::vector<char *> argvReshape = buildArgs(argsReshape);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvReshape.size(), &argvReshape[0]), "CommandLineParser failed to reject non-positive reshape count");
+
+    std::vector<std::string> argsSeed;
+    argsSeed.push_back("clistats");
+    argsSeed.push_back("-se"); argsSeed.push_back("-1");
+    std::vector<char *> argvSeed = buildArgs(argsSeed);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvSeed.size(), &argvSeed[0]), "CommandLineParser failed to reject negative seed value");
+
+    std::vector<std::string> argsRandomStep;
+    argsRandomStep.push_back("clistats");
+    argsRandomStep.push_back("-sr"); argsRandomStep.push_back("0");
+    std::vector<char *> argvRandomStep = buildArgs(argsRandomStep);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvRandomStep.size(), &argvRandomStep[0]), "CommandLineParser failed to reject non-positive random sampling step");
+
+    std::vector<std::string> argsUniformStep;
+    argsUniformStep.push_back("clistats");
+    argsUniformStep.push_back("-su"); argsUniformStep.push_back("0");
+    std::vector<char *> argvUniformStep = buildArgs(argsUniformStep);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvUniformStep.size(), &argvUniformStep[0]), "CommandLineParser failed to reject non-positive uniform sampling step");
+
+    std::vector<std::string> argsMultipleA;
+    argsMultipleA.push_back("clistats");
+    argsMultipleA.push_back("-su"); argsMultipleA.push_back("2");
+    argsMultipleA.push_back("-sr"); argsMultipleA.push_back("3");
+    std::vector<char *> argvMultipleA = buildArgs(argsMultipleA);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvMultipleA.size(), &argvMultipleA[0]), "CommandLineParser failed to reject random sampling after uniform sampling already set");
+
+    std::vector<std::string> argsMultipleB;
+    argsMultipleB.push_back("clistats");
+    argsMultipleB.push_back("-sr"); argsMultipleB.push_back("2");
+    argsMultipleB.push_back("-su"); argsMultipleB.push_back("3");
+    std::vector<char *> argvMultipleB = buildArgs(argsMultipleB);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvMultipleB.size(), &argvMultipleB[0]), "CommandLineParser failed to reject uniform sampling after random sampling already set");
+
+    std::vector<std::string> argsHgMissing;
+    argsHgMissing.push_back("clistats");
+    argsHgMissing.push_back("-hg");
+    std::vector<char *> argvHgMissing = buildArgs(argsHgMissing);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvHgMissing.size(), &argvHgMissing[0]), "CommandLineParser failed to reject missing histogram options");
+
+    std::vector<std::string> argsHgExtra;
+    argsHgExtra.push_back("clistats");
+    argsHgExtra.push_back("-hg"); argsHgExtra.push_back("1,2,3");
+    std::vector<char *> argvHgExtra = buildArgs(argsHgExtra);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvHgExtra.size(), &argvHgExtra[0]), "CommandLineParser failed to reject histogram options with too many tokens");
+
+    std::vector<std::string> argsHgBins;
+    argsHgBins.push_back("clistats");
+    argsHgBins.push_back("-hg"); argsHgBins.push_back("0,200");
+    std::vector<char *> argvHgBins = buildArgs(argsHgBins);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvHgBins.size(), &argvHgBins[0]), "CommandLineParser failed to reject non-positive bin count");
+
+    std::vector<std::string> argsHgCache;
+    argsHgCache.push_back("clistats");
+    argsHgCache.push_back("-hg"); argsHgCache.push_back("5,50");
+    std::vector<char *> argvHgCache = buildArgs(argsHgCache);
+    ASSERT_EXCEPTION(CommandLineParser((int) argvHgCache.size(), &argvHgCache[0]), "CommandLineParser failed to reject undersized histogram cache");
+
 }
 
 /**
@@ -1010,6 +1264,24 @@ void test_dynamichistogram_order()
     double interpolated = histogram.order(2);
     ASSERT(interpolated >= histogram.bin(0) && interpolated <= histogram.bin(3), "DynamicHistogram::order failed to interpolate within histogram range");
 
+    DynamicHistogramOptions optionsFlat;
+    optionsFlat.enabled = true;
+    optionsFlat.binCount = 4;
+    optionsFlat.cacheSize = 4;
+
+    DynamicHistogram<double> histogramFlat(optionsFlat);
+    histogramFlat.add(0.0);
+    histogramFlat.add(0.0);
+    histogramFlat.add(1.0);
+    histogramFlat.add(10.0);
+
+    double midpoint = histogramFlat.bin(0) + 0.5 * (histogramFlat.bin(1) - histogramFlat.bin(0));
+    ASSERT_EQUAL(histogramFlat.order(3), midpoint, "DynamicHistogram::order failed to interpolate flat CDF region");
+
+    DynamicHistogram<double> * histogramHeap = new DynamicHistogram<double>(options);
+    histogramHeap->add(1.0);
+    delete histogramHeap;
+
 }
 
 /**
@@ -1059,6 +1331,17 @@ void test_statisticswriter_output()
     std::ostringstream dataStream;
     writer.writeData(dataStream, data, ",");
     ASSERT_EQUAL(dataStream.str(), "1,3\n", "StatisticsWriter::writeData failed to skip inactive data points");
+
+    DataVector disabledData;
+    disabledData.push_back(DataPoint(1,true));
+    StatisticsTrackerOptions disabledOptions;
+    disabledOptions.doCov = disabledOptions.doMax = disabledOptions.doMean = disabledOptions.doMin = disabledOptions.doVar = true;
+    MultivariateTracker disabledTracker(1, disabledOptions);
+    disabledTracker.update(disabledData);
+
+    std::ostringstream disabledHistograms;
+    writer.writeHistograms(disabledHistograms, disabledTracker);
+    ASSERT(disabledHistograms.str().find("No valid data") != std::string::npos, "StatisticsWriter::writeHistograms failed to report no data for a disabled histogram");
 
 }
 
@@ -1140,6 +1423,434 @@ void test_statisticsapp_blankcomment()
 }
 
 /**
+ * Test Logger::log at ERROR, WARNING, and INFO levels
+ */
+void test_logger_levels()
+{
+
+    Logger::Level::Type saved = Logger::logLevel;
+    Logger::logLevel = Logger::Level::INFO;
+
+    std::ostringstream error;
+    std::streambuf * oldErrBuf = std::cerr.rdbuf(error.rdbuf());
+    Logger::log(Logger::Level::ERROR) << "error message" << std::endl;
+    std::cerr.rdbuf(oldErrBuf);
+    ASSERT(error.str().find("ERROR") != std::string::npos, "Logger::log failed to label ERROR level");
+
+    std::ostringstream warning;
+    std::streambuf * oldWarnBuf = std::cerr.rdbuf(warning.rdbuf());
+    Logger::log(Logger::Level::WARNING) << "warning message" << std::endl;
+    std::cerr.rdbuf(oldWarnBuf);
+    ASSERT(warning.str().find("WARNING") != std::string::npos, "Logger::log failed to label WARNING level");
+
+    std::ostringstream info;
+    std::streambuf * oldInfoBuf = std::cout.rdbuf(info.rdbuf());
+    Logger::log(Logger::Level::INFO) << "info message" << std::endl;
+    std::cout.rdbuf(oldInfoBuf);
+    ASSERT(info.str().find("INFO") != std::string::npos, "Logger::log failed to label INFO level");
+
+    Logger::logLevel = saved;
+
+}
+
+
+void test_statisticsapp_badoutputfile()
+{
+
+    std::string fileInput = "test_statisticsapp_badoutputfile_input.csv";
+    std::ofstream input(fileInput.c_str());
+    input << "1,2" << std::endl;
+    input.close();
+
+    CommandLineOptions options;
+    options.fileInput = fileInput;
+    options.fileOutput = "/no_such_directory_xyz/out.csv";
+    options.delimiter = ",";
+    options.showStatistics = true;
+
+    std::ostringstream fallback;
+    std::streambuf * oldCoutBuf = std::cout.rdbuf(fallback.rdbuf());
+    StatisticsApp app(options);
+    app.run();
+    app.display();
+    std::cout.rdbuf(oldCoutBuf);
+
+    ASSERT(fallback.str().find("Statistics") != std::string::npos, "StatisticsApp failed to fall back to standard output on bad output file");
+
+    std::remove(fileInput.c_str());
+
+}
+
+/**
+ * Test StatisticsApp exits immediately on blank line when blankEOF is set
+ */
+void test_statisticsapp_blankeof()
+{
+
+    std::string fileInput = "test_statisticsapp_blankeof_input.csv";
+    std::string fileOutput = "test_statisticsapp_blankeof_output.csv";
+
+    std::ofstream input(fileInput.c_str());
+    input << "1,2" << std::endl;
+    input << std::endl;
+    input << "3,4" << std::endl;
+    input.close();
+
+    CommandLineOptions options;
+    options.fileInput = fileInput;
+    options.fileOutput = fileOutput;
+    options.delimiter = ",";
+    options.blankEOF = true;
+    options.showStatistics = true;
+
+    StatisticsApp app(options);
+    app.run();
+    app.display();
+
+    std::ifstream output(fileOutput.c_str());
+    std::stringstream contents;
+    contents << output.rdbuf();
+    output.close();
+
+    ASSERT(contents.str().find("Count") != std::string::npos, "StatisticsApp::run failed to produce statistics before blank EOF line");
+    ASSERT(contents.str().find("3") == std::string::npos, "StatisticsApp::run failed to stop processing at blank EOF line");
+
+    std::remove(fileInput.c_str());
+    std::remove(fileOutput.c_str());
+
+}
+
+/**
+ * Test StatisticsApp skip/keep line counts and uniform row sampling
+ */
+void test_statisticsapp_rowselection()
+{
+
+    std::string fileInputSkipKeep = "test_statisticsapp_rowselection_skipkeep_input.csv";
+    std::string fileOutputSkipKeep = "test_statisticsapp_rowselection_skipkeep_output.csv";
+
+    std::ofstream inputSkipKeep(fileInputSkipKeep.c_str());
+    inputSkipKeep << "1,1" << std::endl;
+    inputSkipKeep << "2,2" << std::endl;
+    inputSkipKeep << "3,3" << std::endl;
+    inputSkipKeep << "4,4" << std::endl;
+    inputSkipKeep << "5,5" << std::endl;
+    inputSkipKeep.close();
+
+    CommandLineOptions optionsSkipKeep;
+    optionsSkipKeep.fileInput = fileInputSkipKeep;
+    optionsSkipKeep.fileOutput = fileOutputSkipKeep;
+    optionsSkipKeep.delimiter = ",";
+    optionsSkipKeep.numLinesToSkip = 1;
+    optionsSkipKeep.numLinesToKeep = 2;
+    optionsSkipKeep.showStatistics = true;
+    optionsSkipKeep.statisticsOptions.doCov = optionsSkipKeep.statisticsOptions.doMax = optionsSkipKeep.statisticsOptions.doMean = optionsSkipKeep.statisticsOptions.doMin = optionsSkipKeep.statisticsOptions.doVar = true;
+
+    StatisticsApp appSkipKeep(optionsSkipKeep);
+    appSkipKeep.run();
+    appSkipKeep.display();
+
+    std::ifstream outputSkipKeep(fileOutputSkipKeep.c_str());
+    std::stringstream contentsSkipKeep;
+    contentsSkipKeep << outputSkipKeep.rdbuf();
+    outputSkipKeep.close();
+
+    std::string outputContentSkipKeep = contentsSkipKeep.str();
+    ASSERT(outputContentSkipKeep.find("2.000000") != std::string::npos, "StatisticsApp::run failed to skip leading lines");
+    ASSERT(outputContentSkipKeep.find("5.000000") == std::string::npos, "StatisticsApp::run failed to stop after keep count reached");
+
+    std::remove(fileInputSkipKeep.c_str());
+    std::remove(fileOutputSkipKeep.c_str());
+
+    std::string fileInputSampling = "test_statisticsapp_rowselection_sampling_input.csv";
+    std::string fileOutputSampling = "test_statisticsapp_rowselection_sampling_output.csv";
+
+    std::ofstream inputSampling(fileInputSampling.c_str());
+    inputSampling << "1,1" << std::endl;
+    inputSampling << "2,2" << std::endl;
+    inputSampling << "3,3" << std::endl;
+    inputSampling << "4,4" << std::endl;
+    inputSampling.close();
+
+    CommandLineOptions optionsSampling;
+    optionsSampling.fileInput = fileInputSampling;
+    optionsSampling.fileOutput = fileOutputSampling;
+    optionsSampling.delimiter = ",";
+    optionsSampling.sampling.mode = SamplerOptions::UNIFORM;
+    optionsSampling.sampling.step = 2;
+    optionsSampling.showStatistics = true;
+
+    StatisticsApp appSampling(optionsSampling);
+    appSampling.run();
+    appSampling.display();
+
+    std::ifstream outputSampling(fileOutputSampling.c_str());
+    std::stringstream contentsSampling;
+    contentsSampling << outputSampling.rdbuf();
+    outputSampling.close();
+
+    ASSERT(contentsSampling.str().find("2") != std::string::npos, "StatisticsApp::run failed to process rows with uniform sampling");
+
+    std::remove(fileInputSampling.c_str());
+    std::remove(fileOutputSampling.c_str());
+
+}
+
+/**
+ * Test StatisticsApp applies header row titles and falls back to numbered titles on mismatch
+ */
+void test_statisticsapp_headertitles()
+{
+
+    std::string fileInputMatch = "test_statisticsapp_headertitles_match_input.csv";
+    std::string fileOutputMatch = "test_statisticsapp_headertitles_match_output.csv";
+
+    std::ofstream inputMatch(fileInputMatch.c_str());
+    inputMatch << "col1,col2" << std::endl;
+    inputMatch << "1,2" << std::endl;
+    inputMatch << "3,4" << std::endl;
+    inputMatch.close();
+
+    CommandLineOptions optionsMatch;
+    optionsMatch.fileInput = fileInputMatch;
+    optionsMatch.fileOutput = fileOutputMatch;
+    optionsMatch.delimiter = ",";
+    optionsMatch.headerRow = 1;
+    optionsMatch.showStatistics = true;
+
+    StatisticsApp appMatch(optionsMatch);
+    appMatch.run();
+    appMatch.display();
+
+    std::ifstream outputMatch(fileOutputMatch.c_str());
+    std::stringstream contentsMatch;
+    contentsMatch << outputMatch.rdbuf();
+    outputMatch.close();
+
+    ASSERT(contentsMatch.str().find("col1") != std::string::npos, "StatisticsApp::run failed to apply header row titles");
+
+    std::remove(fileInputMatch.c_str());
+    std::remove(fileOutputMatch.c_str());
+
+    std::string fileInputMismatch = "test_statisticsapp_headertitles_mismatch_input.csv";
+    std::string fileOutputMismatch = "test_statisticsapp_headertitles_mismatch_output.csv";
+
+    std::ofstream inputMismatch(fileInputMismatch.c_str());
+    inputMismatch << "col1,col2,col3" << std::endl;
+    inputMismatch << "1,2" << std::endl;
+    inputMismatch << "3,4" << std::endl;
+    inputMismatch.close();
+
+    CommandLineOptions optionsMismatch;
+    optionsMismatch.fileInput = fileInputMismatch;
+    optionsMismatch.fileOutput = fileOutputMismatch;
+    optionsMismatch.delimiter = ",";
+    optionsMismatch.headerRow = 1;
+    optionsMismatch.showStatistics = true;
+
+    StatisticsApp appMismatch(optionsMismatch);
+    appMismatch.run();
+    appMismatch.display();
+
+    std::ifstream outputMismatch(fileOutputMismatch.c_str());
+    std::stringstream contentsMismatch;
+    contentsMismatch << outputMismatch.rdbuf();
+    outputMismatch.close();
+
+    ASSERT(contentsMismatch.str().find("col1") == std::string::npos, "StatisticsApp::run failed to discard mismatched header titles");
+
+    std::remove(fileInputMismatch.c_str());
+    std::remove(fileOutputMismatch.c_str());
+
+}
+
+/**
+ * Test StatisticsApp strict-parsing dimension mismatch skipping and string/numeric filter rejection
+ */
+void test_statisticsapp_rowfiltering()
+{
+
+    std::string fileInputStrict = "test_statisticsapp_rowfiltering_strict_input.csv";
+    std::string fileOutputStrict = "test_statisticsapp_rowfiltering_strict_output.csv";
+
+    std::ofstream inputStrict(fileInputStrict.c_str());
+    inputStrict << "1,2" << std::endl;
+    inputStrict << "3,4,5" << std::endl;
+    inputStrict << "6,7" << std::endl;
+    inputStrict.close();
+
+    CommandLineOptions optionsStrict;
+    optionsStrict.fileInput = fileInputStrict;
+    optionsStrict.fileOutput = fileOutputStrict;
+    optionsStrict.delimiter = ",";
+    optionsStrict.strictParsing = true;
+    optionsStrict.showStatistics = true;
+    optionsStrict.statisticsOptions.doCov = optionsStrict.statisticsOptions.doMax = optionsStrict.statisticsOptions.doMean = optionsStrict.statisticsOptions.doMin = optionsStrict.statisticsOptions.doVar = true;
+
+    StatisticsApp appStrict(optionsStrict);
+    appStrict.run();
+    appStrict.display();
+
+    std::ifstream outputStrict(fileOutputStrict.c_str());
+    std::stringstream contentsStrict;
+    contentsStrict << outputStrict.rdbuf();
+    outputStrict.close();
+
+    ASSERT(contentsStrict.str().find("2.000000") != std::string::npos, "StatisticsApp::run failed to process rows around a strict dimension mismatch");
+
+    std::remove(fileInputStrict.c_str());
+    std::remove(fileOutputStrict.c_str());
+
+    std::string fileInputFilter = "test_statisticsapp_rowfiltering_filter_input.csv";
+    std::string fileOutputFilter = "test_statisticsapp_rowfiltering_filter_output.csv";
+
+    std::ofstream inputFilter(fileInputFilter.c_str());
+    inputFilter << "foo,1" << std::endl;
+    inputFilter << "bar,100" << std::endl;
+    inputFilter << "foo,100" << std::endl;
+    inputFilter << "foo,2" << std::endl;
+    inputFilter.close();
+
+    CommandLineOptions optionsFilter;
+    optionsFilter.fileInput = fileInputFilter;
+    optionsFilter.fileOutput = fileOutputFilter;
+    optionsFilter.delimiter = ",";
+    optionsFilter.filterRows.addStringFilter(0,"bar",true,true,false);
+    optionsFilter.filterRows.addNumericFilter(1,0,10,true);
+    optionsFilter.showStatistics = true;
+    optionsFilter.statisticsOptions.doCov = optionsFilter.statisticsOptions.doMax = optionsFilter.statisticsOptions.doMean = optionsFilter.statisticsOptions.doMin = optionsFilter.statisticsOptions.doVar = true;
+
+    StatisticsApp appFilter(optionsFilter);
+    appFilter.run();
+    appFilter.display();
+
+    std::ifstream outputFilter(fileOutputFilter.c_str());
+    std::stringstream contentsFilter;
+    contentsFilter << outputFilter.rdbuf();
+    outputFilter.close();
+
+    ASSERT(contentsFilter.str().find("1.500000") != std::string::npos, "StatisticsApp::run failed to process rows passing string and numeric filters");
+
+    std::remove(fileInputFilter.c_str());
+    std::remove(fileOutputFilter.c_str());
+
+}
+
+/**
+ * Test StatisticsApp writes raw filtered data and reads carriage-return line feed terminated lines
+ */
+void test_statisticsapp_io()
+{
+
+    std::string fileInputRaw = "test_statisticsapp_io_raw_input.csv";
+    std::string fileOutputRaw = "test_statisticsapp_io_raw_output.csv";
+
+    std::ofstream inputRaw(fileInputRaw.c_str());
+    inputRaw << "1,2" << std::endl;
+    inputRaw.close();
+
+    CommandLineOptions optionsRaw;
+    optionsRaw.fileInput = fileInputRaw;
+    optionsRaw.fileOutput = fileOutputRaw;
+    optionsRaw.delimiter = ",";
+    optionsRaw.showFilteredData = true;
+
+    StatisticsApp appRaw(optionsRaw);
+    appRaw.run();
+    appRaw.display();
+
+    std::ifstream outputRaw(fileOutputRaw.c_str());
+    std::stringstream contentsRaw;
+    contentsRaw << outputRaw.rdbuf();
+    outputRaw.close();
+
+    ASSERT_EQUAL(contentsRaw.str(), "1 2\n", "StatisticsApp::run failed to write raw filtered data");
+
+    std::remove(fileInputRaw.c_str());
+    std::remove(fileOutputRaw.c_str());
+
+    std::string fileInputCrlf = "test_statisticsapp_io_crlf_input.csv";
+    std::string fileOutputCrlf = "test_statisticsapp_io_crlf_output.csv";
+
+    std::ofstream inputCrlf(fileInputCrlf.c_str(), std::ios::binary);
+    inputCrlf << "1,2\r\n";
+    inputCrlf << "3,4\r\n";
+    inputCrlf.close();
+
+    CommandLineOptions optionsCrlf;
+    optionsCrlf.fileInput = fileInputCrlf;
+    optionsCrlf.fileOutput = fileOutputCrlf;
+    optionsCrlf.delimiter = ",";
+    optionsCrlf.showStatistics = true;
+    optionsCrlf.statisticsOptions.doCov = optionsCrlf.statisticsOptions.doMax = optionsCrlf.statisticsOptions.doMean = optionsCrlf.statisticsOptions.doMin = optionsCrlf.statisticsOptions.doVar = true;
+
+    StatisticsApp appCrlf(optionsCrlf);
+    appCrlf.run();
+    appCrlf.display();
+
+    std::ifstream outputCrlf(fileOutputCrlf.c_str());
+    std::stringstream contentsCrlf;
+    contentsCrlf << outputCrlf.rdbuf();
+    outputCrlf.close();
+
+    ASSERT(contentsCrlf.str().find("2.000000") != std::string::npos, "StatisticsApp::run failed to read carriage-return line feed terminated lines");
+
+    std::remove(fileInputCrlf.c_str());
+    std::remove(fileOutputCrlf.c_str());
+
+}
+
+/**
+ * Test StatisticsApp displays covariance, correlation, least squares, and histogram outputs
+ */
+void test_statisticsapp_alloutputs()
+{
+
+    std::string fileInput = "test_statisticsapp_alloutputs_input.csv";
+    std::string fileOutput = "test_statisticsapp_alloutputs_output.csv";
+
+    std::ofstream input(fileInput.c_str());
+    input << "1,2" << std::endl;
+    input << "2,4" << std::endl;
+    input << "3,6" << std::endl;
+    input.close();
+
+    CommandLineOptions options;
+    options.fileInput = fileInput;
+    options.fileOutput = fileOutput;
+    options.delimiter = ",";
+    options.showCovariance = true;
+    options.showCorrelation = true;
+    options.showLeastSquaresOffset = true;
+    options.showLeastSquaresSlope = true;
+    options.showHistogram = true;
+    options.statisticsOptions.doCov = options.statisticsOptions.doMax = options.statisticsOptions.doMean = options.statisticsOptions.doMin = options.statisticsOptions.doVar = true;
+    options.statisticsOptions.histogramOptions.enabled = true;
+    options.statisticsOptions.histogramOptions.binCount = 2;
+    options.statisticsOptions.histogramOptions.cacheSize = 2;
+
+    StatisticsApp app(options);
+    app.run();
+    app.display();
+
+    std::ifstream output(fileOutput.c_str());
+    std::stringstream contents;
+    contents << output.rdbuf();
+    output.close();
+
+    std::string outputContent = contents.str();
+    ASSERT(outputContent.find("Covariance") != std::string::npos, "StatisticsApp::display failed to write covariance matrix");
+    ASSERT(outputContent.find("Correlation") != std::string::npos, "StatisticsApp::display failed to write correlation matrix");
+    ASSERT(outputContent.find("Offset") != std::string::npos, "StatisticsApp::display failed to write least squares offset matrix");
+    ASSERT(outputContent.find("Slope") != std::string::npos, "StatisticsApp::display failed to write least squares slope matrix");
+    ASSERT(outputContent.find("Histogram") != std::string::npos, "StatisticsApp::display failed to write histograms");
+
+    std::remove(fileInput.c_str());
+    std::remove(fileOutput.c_str());
+
+}
+
+/**
  * Unit tester for clistats
  */
 int
@@ -1186,6 +1897,14 @@ main()
     tests.push_back(test_pdrv);
     tests.push_back(test_dynamichistogram_order);
     tests.push_back(test_statisticswriter_output);
+    tests.push_back(test_logger_levels);
+    tests.push_back(test_statisticsapp_badoutputfile);
+    tests.push_back(test_statisticsapp_blankeof);
+    tests.push_back(test_statisticsapp_rowselection);
+    tests.push_back(test_statisticsapp_headertitles);
+    tests.push_back(test_statisticsapp_rowfiltering);
+    tests.push_back(test_statisticsapp_io);
+    tests.push_back(test_statisticsapp_alloutputs);
 
     // ======================================================================
     // Define test metrics
