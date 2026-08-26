@@ -1974,6 +1974,7 @@ main()
     }
 
     // Print errors that occured
+    // LCOV_EXCL_START
     std::cerr << header << std::endl;
     std::cerr << "    Testing Errors " << std::endl;
     std::cerr << footer << std::endl;
@@ -1987,5 +1988,5 @@ main()
     std::cerr << std::endl;
 
     return 1;
-    
+    // LCOV_EXCL_STOP
 }
