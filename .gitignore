@@ -1,2 +1,7 @@
 /clistats
 /clistatstest
+/coverage_html
+*.gcda
+*.gcno
+*.gcov
+coverage.info
