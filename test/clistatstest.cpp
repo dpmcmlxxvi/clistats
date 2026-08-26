@@ -1941,12 +1941,14 @@ main()
         {
             (*test)();
         }
+        // LCOV_EXCL_START
         catch (std::exception const & ex)
         {
             numTestsFail++;
             errors.push_back(ex.what());
             message = "F";
         }
+        // LCOV_EXCL_STOP
         std::cout << message;
     }
     std::cout << std::endl;
