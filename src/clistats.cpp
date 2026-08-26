@@ -2180,11 +2180,6 @@ private:
                 // Parse filters into delimited tokens
                 StringSplitter parser(value, ",");
                 std::vector<std::string> values = parser.tokens();
-                
-                if (values.size() == 0)
-                {
-                    throw std::runtime_error("Invalid numeric filter value = " + value);
-                }
 
                 // Numeric filter
                 if (values.size() < 3 || values.size() > 4)
@@ -4055,11 +4050,13 @@ pdrv(int argc,
         int status = application.run();
         if (status != 0) return AppStatus::FAILED_RUN;
     }
+    // LCOV_EXCL_START
     catch (std::exception & ex)
     {
         LOG_MESSAGE(Logger::Level::FATAL, ex.what());
         return AppStatus::FAILED_RUN;
     }
+    // LCOV_EXCL_STOP
 
     // ======================================================================
     // Display results
@@ -4070,11 +4067,13 @@ pdrv(int argc,
         bool isDisplayValid = application.display();
         if (!isDisplayValid) return AppStatus::FAILED_DISPLAY;
     }
+    // LCOV_EXCL_START
     catch (std::exception & ex)
     {
         LOG_MESSAGE(Logger::Level::FATAL, ex.what());
         return AppStatus::FAILED_DISPLAY;
     }
+    // LCOV_EXCL_STOP
         
     return AppStatus::SUCCESS;
 
