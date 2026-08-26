@@ -1,4 +1,3 @@
-
 /**
  * Computes command line interface statistics for a stream of delimited input numbers.
  * @author Daniel Pulido <dpmcmlxxvi@gmail.com>
@@ -26,16 +25,7 @@
 #include <utility>
 #include <vector>
 
-// macros for logging message
-#define LOG_MESSAGE(level, message)             \
-    {                                           \
-        if (level <= Logger::logLevel)          \
-        {                                       \
-            std::stringstream msg;              \
-            msg << message << std::endl;        \
-            Logger::log(level) << msg.str();    \
-        }                                       \
-    }
+
 
 /**
  * @struct ApplicationProperties
@@ -51,27 +41,21 @@ struct ApplicationProperties
     std::string
     version()
     {
-        return ApplicationProperties::VERSION_MAJOR + "." +
+        return std::string(ApplicationProperties::VERSION_MAJOR) + "." +
             ApplicationProperties::VERSION_MINOR + "." +
             ApplicationProperties::VERSION_PATCH;
     }
-    static std::string NAME;
-    static std::string AUTHOR;
-    static std::string VERSION_MAJOR;
-    static std::string VERSION_MINOR;
-    static std::string VERSION_PATCH;
+    static constexpr const char * NAME = "clistats";
+    static constexpr const char * AUTHOR = "dpmcmlxxvi@gmail.com";
+    static constexpr const char * VERSION_MAJOR = "1";
+    static constexpr const char * VERSION_MINOR = "1";
+    static constexpr const char * VERSION_PATCH = "0";
 };
-
-std::string ApplicationProperties::NAME = "clistats";
-std::string ApplicationProperties::AUTHOR = "dpmcmlxxvi@gmail.com";
-std::string ApplicationProperties::VERSION_MAJOR = "1";
-std::string ApplicationProperties::VERSION_MINOR = "1";
-std::string ApplicationProperties::VERSION_PATCH = "0";
 
 /**
  * @struct Logger
  * @brief Simple logger
- * @details Should be invoked via macro "LOG_MESSAGE(Logger::Level, "message");"
+ * @details Should be invoked via "logMessage(Logger::Level, ...) << "message";"
  */
 struct Logger
 {
@@ -123,6 +107,79 @@ struct Logger
 Logger::Level::Type Logger::logLevel = Logger::Level::FATAL;
 
 /**
+ * @class LogStream
+ * @brief Streams a log message to the logger's output if its level is enabled
+ * @details Returned by #logMessage. Values streamed in with operator<< are
+ *          only written out if the given level is enabled; the stream is
+ *          terminated with an end-of-line when the temporary is destroyed.
+ */
+class LogStream
+{
+public:
+
+    /**
+     * Initialize log stream for the given level
+     * @param[in] level Logger level of this message
+     */
+    explicit
+    LogStream(Logger::Level::Type level) :
+        _enabled(level <= Logger::logLevel),
+        _stream(0)
+    {
+        if (this->_enabled)
+        {
+            this->_stream = &Logger::log(level);
+        }
+    }
+
+    /**
+     * Terminate the message with an end-of-line if the level was enabled
+     */
+    ~LogStream()
+    {
+        if (this->_enabled)
+        {
+            *(this->_stream) << std::endl;
+        }
+    }
+
+    /**
+     * Stream a value into the log message
+     * @param[in] value Value to stream
+     * @return Reference to this log stream
+     */
+    template <class T>
+    LogStream &
+    operator<<(T const & value)
+    {
+        if (this->_enabled)
+        {
+            *(this->_stream) << value;
+        }
+        return *this;
+    }
+
+private:
+
+    bool _enabled;
+    std::ostream * _stream;
+
+};
+
+/**
+ * Create a log stream for the given level
+ * @param[in] level Logger level of this message
+ * @return Log stream that writes to the logger's output only if level is enabled
+ */
+inline
+LogStream
+logMessage(Logger::Level::Type level)
+{
+    return LogStream(level);
+}
+
+
+/**
  * @class StringParser
  * @brief String parsing methods
  */
@@ -144,7 +201,7 @@ public:
                 bool isScientific = false)
     {
         // Check for NaN to consistently return "nan"
-        if (std::isnan((double)value)) return "nan";
+        if (std::isnan(static_cast<double>(value))) return "nan";
         std::string entry;
         std::stringstream parser;
         parser << (isScientific ? std::scientific : std::fixed) << value;
@@ -317,7 +374,7 @@ public:
      * @return Vector of split string
      */
     const std::vector<std::string> &
-    get() const
+    get() const noexcept
     {
         return this->_tokens;
     }
@@ -525,7 +582,7 @@ public:
      * @return Cache count
      */
     int
-    count() const
+    count() const noexcept
     {
         return this->_count;
     }
@@ -535,7 +592,7 @@ public:
      * @return True of cache is empty otherwise false
      */
     bool
-    empty() const
+    empty() const noexcept
     {
         return (this->_count == 0);
     }
@@ -547,7 +604,7 @@ public:
     bool
     full() const
     {
-        return (this->_count >= (int)this->_data.size());
+        return (this->_count >= static_cast<int>(this->_data.size()));
     }
 
     /**
@@ -690,7 +747,7 @@ public:
     
         if (!this->_enabled) return false;
 
-        double dValue = (double) value;
+        double dValue = static_cast<double>(value);
 
         /* Add new data to cache if histogram is uninitialized or not within its bounds */
         if (!(this->_initialized && this->contains_(dValue)))
@@ -742,10 +799,10 @@ public:
         std::vector<double> prob = this->pdf();
 
         double sum = 0;
-        for (std::vector<double>::iterator it = prob.begin(); it != prob.end(); ++it)
+        for (double & value : prob)
         {
-            *it += sum;
-            sum = *it;
+            value += sum;
+            sum = value;
         }
 
         return prob;
@@ -782,7 +839,7 @@ public:
      * @return True if histogram is enabled otherwise false.
      */
     bool
-    enabled() const
+    enabled() const noexcept
     {
         return this->_enabled;
     }
@@ -832,7 +889,7 @@ public:
      * @return True if histogram has been initialized otherwise false.
      */
     bool
-    initialized() const
+    initialized() const noexcept
     {
         return this->_initialized;
     }
@@ -889,7 +946,7 @@ public:
 
         // Compute order's probability and clip at [0,1]
         double numItems = this->total();
-        double probability = (double) (kth) / numItems;
+        double probability = static_cast<double>(kth) / numItems;
         probability = std::max<double>(0, probability);
         probability = std::min<double>(1, probability);
 
@@ -934,12 +991,8 @@ public:
 
         double sum = this->total();
 
-        std::vector<double>::iterator dist = prob.begin();
-        for (std::vector<double>::const_iterator freq = this->_frequencies.begin(); freq != this->_frequencies.end(); ++freq)
-        {
-            *dist = (*freq) / sum;
-            ++dist;
-        }
+        std::transform(this->_frequencies.begin(), this->_frequencies.end(), prob.begin(),
+                        [sum](double freq) { return freq / sum; });
 
         return prob;
 
@@ -1009,9 +1062,9 @@ public:
         histogram._binMin = minData;
         histogram._binWidth = (histogram._binMax - histogram._binMin) / histogram._binCount;
         histogram._initialized = true;
-        for (typename std::vector<T>::iterator it = data.begin(); it != data.end(); ++it)
+        for (T const & item : data)
         {
-            double dValue = (double) *it;
+            double dValue = static_cast<double>(item);
             if (histogram.contains_(dValue)) histogram.add_(dValue);
         }
 
@@ -1054,7 +1107,7 @@ protected:
                 this->_binMin   = mid - 0.5 * this->_binWidth * this->_binCount;
                 this->_binMax   = mid + 0.5 * this->_binWidth * this->_binCount;
             } else {
-                this->_binWidth = range / (double) this->_binCount;
+                this->_binWidth = range / static_cast<double>(this->_binCount);
             }
 
             // Update with cache data
@@ -1087,16 +1140,16 @@ protected:
         // Compute how much to scale the old histogram to get the new histogram
         double oldHistogramWidth = this->_binMax - this->_binMin;
         double newHistogramWidth = newMax - newMin;
-        int histogramScale = (int) ceil((newHistogramWidth / oldHistogramWidth));
+        int histogramScale = static_cast<int>(ceil((newHistogramWidth / oldHistogramWidth)));
 
         // Compute dynamic range in units of histogram scale
-        int newBinCountAfterScale = (int) (histogramScale * this->_binCount);
+        int newBinCountAfterScale = static_cast<int>(histogramScale * this->_binCount);
 
         // Compute number of empty bins
         double newMaxAfterScale = newMin + newBinCountAfterScale * this->_binWidth;
         double emptySpace = newMaxAfterScale - newMax;
-        int numEmptyBins = (int) (emptySpace / this->_binWidth);
-        int numEmptyBinsToShift = (int) (numEmptyBins/2);
+        int numEmptyBins = static_cast<int>(emptySpace / this->_binWidth);
+        int numEmptyBinsToShift = static_cast<int>(numEmptyBins/2);
 
         // Compute final dynamic range
         double newMinFinal = newMin - numEmptyBinsToShift * this->_binWidth;
@@ -1109,7 +1162,7 @@ protected:
         for (int i = 0; i < this->_binCount; i++)
         {
             double oldBinCenterInNewBins = this->bin_(i);
-            int newBinIndex =  (int)((oldBinCenterInNewBins - newMinFinal) / newBinWidthFinal);
+            int newBinIndex = static_cast<int>((oldBinCenterInNewBins - newMinFinal) / newBinWidthFinal);
             this->_temp.at(newBinIndex) += this->frequency_(i);
         }
 
@@ -1156,7 +1209,7 @@ private:
     contains_(double const value)
     {
         int idx = this->index_(value);
-        bool isContained = (idx >= 0) && (idx < (int) this->_binCount);
+        bool isContained = (idx >= 0) && (idx < static_cast<int>(this->_binCount));
         return isContained;
     }
     
@@ -1176,7 +1229,7 @@ private:
     index_(double const value)
     {
         if (value == this->_binMax) return (this->_binCount - 1);
-        int idx = (int) floor((value - this->_binMin) / this->_binWidth);
+        int idx = static_cast<int>(floor((value - this->_binMin) / this->_binWidth));
         return idx;
     }
 
@@ -1294,9 +1347,9 @@ public:
     void
     deactivate()
     {
-        for (DataVector::iterator it = this->begin(); it != this->end(); ++it)
+        for (DataPoint & point : *this)
         {
-            it->active = false;
+            point.active = false;
         }
     }
 
@@ -1509,10 +1562,10 @@ public:
         unsigned long int size = static_cast<unsigned long int>(data.size());
         // Iterate through and check if any filter applies to this data point
         if (this->_numericFilters.size() == 0) return true;
-        for (std::vector<NumericFilterCase>::const_iterator it = this->_numericFilters.begin(); it != this->_numericFilters.end(); ++it)
+        for (NumericFilterCase const & filter : this->_numericFilters)
         {
-            if (it->index >= size || !data.at(it->index).active) continue; // don't check if out-of-range or data is not active
-            if (it->filter.isFiltered(data.at(it->index).value)) return true;
+            if (filter.index >= size || !data.at(filter.index).active) continue; // don't check if out-of-range or data is not active
+            if (filter.filter.isFiltered(data.at(filter.index).value)) return true;
         }
         return false;
     }
@@ -1528,10 +1581,10 @@ public:
         unsigned long int size = static_cast<unsigned long int>(data.size());
         // Iterate through and check if any filter applies to this data point
         if (this->_stringFilters.size() == 0) return true;
-        for (std::vector<StringFilterCase>::const_iterator it = this->_stringFilters.begin(); it != this->_stringFilters.end(); ++it)
+        for (StringFilterCase const & filter : this->_stringFilters)
         {
-            if (it->index >= size) continue; // don't check if out-of-range
-            if (it->filter.isFiltered(data.at(it->index))) return true;
+            if (filter.index >= size) continue; // don't check if out-of-range
+            if (filter.filter.isFiltered(data.at(filter.index))) return true;
         }
         return false;
     }
@@ -1911,7 +1964,7 @@ public:
      * @return True if usage was requested otherwise false
      */
     bool
-    showUsage() const
+    showUsage() const noexcept
     {
         return this->_showUsage;
     }
@@ -1921,7 +1974,7 @@ public:
      * @return True if version was requested otherwise false
      */
     bool
-    showVersion() const
+    showVersion() const noexcept
     {
         return this->_showVersion;
     }
@@ -1947,7 +2000,7 @@ private:
         arguments.pop_front(); // Remove executable name
         while (!arguments.empty())
         {
-            std::list<std::string>::iterator argument = arguments.begin();
+            auto argument = arguments.begin();
             std::string flag(*argument);
             if (flag == "-h" || flag == "--help")
             {
@@ -2025,7 +2078,7 @@ private:
                 {
                     throw std::runtime_error("Invalid delimiter ASCII code");
                 }
-                char character = (char) code;
+                char character = static_cast<char>(code);
                 this->options.delimiter += character;
                 arguments.pop_front();
                 arguments.pop_front();
@@ -2147,13 +2200,13 @@ private:
                     }
                     
                     // Check each range entry is positive
-                    for (std::vector<int>::iterator it = range.begin(); it != range.end(); ++it)
+                    for (int entry : range)
                     {
-                        if (*it <= 0)
+                        if (entry <= 0)
                         {
                             throw std::runtime_error("Invalid filter column value = " + values.at(j));
                         }
-                        filters.push_back(*it-1);
+                        filters.push_back(entry-1);
                     }                    
                     
                 }
@@ -2601,7 +2654,7 @@ public:
      * @return Number of data points
      */
     long
-    getCount(void) const
+    getCount() const noexcept
     {
         return this->_count;
     }
@@ -2611,7 +2664,7 @@ public:
      * @return Histogram
      */
     DynamicHistogram<double>
-    getHistogram(void) const
+    getHistogram() const
     {
         return this->_histogram;
     }
@@ -2621,7 +2674,7 @@ public:
      * @return Data minimum
      */
     double
-    getMinimum(void) const
+    getMinimum() const noexcept
     {
         return this->_minimum;
     }
@@ -2631,7 +2684,7 @@ public:
      * @return Data mean
      */
     double
-    getMean(void) const
+    getMean() const noexcept
     {
         return this->_mean;
     }
@@ -2641,7 +2694,7 @@ public:
      * @return Data maximum
      */
     double
-    getMaximum(void) const
+    getMaximum() const noexcept
     {
         return this->_maximum;
     }
@@ -2651,7 +2704,7 @@ public:
      * @return Data name
      */
     std::string
-    getName(void) const
+    getName() const
     {
         return this->_name;
     }
@@ -2661,7 +2714,7 @@ public:
      * @return Data variance
      */
     double
-    getVariance(void) const
+    getVariance() const noexcept
     {
         return this->_variance;
     }
@@ -2738,7 +2791,7 @@ public:
             if (this->_options.doMean)
             {
                 // update mean
-                this->_mean += delta / (double) this->_count;
+                this->_mean += delta / static_cast<double>(this->_count);
             }
 
             if (this->_options.doVar)
@@ -2882,9 +2935,9 @@ public:
      * @return Tracker dimension
      */
     long
-    getDimension() const
+    getDimension() const noexcept
     {
-        return (long) this->_statistics.size();
+        return static_cast<long>(this->_statistics.size());
     }
 
     /**
@@ -3051,8 +3104,8 @@ public:
         }
 
         // Update statistics with each data point
-        DataVector::const_iterator datum = data.begin();
-        std::vector<StatisticsTracker>::iterator tracker = this->_statistics.begin();
+        auto datum = data.begin();
+        auto tracker = this->_statistics.begin();
         for ( ; tracker != this->_statistics.end(); ++tracker, ++datum)
         {
             if (datum->active) tracker->update(datum->value);
@@ -3138,7 +3191,7 @@ public:
               std::string const & delimiter = " ")
     {
 
-        for (DataVector::const_iterator it = data.begin(); it != data.end();)
+        for (auto it = data.begin(); it != data.end();)
         {
             // Skip inactive data
             if (!it->active)
@@ -3227,10 +3280,10 @@ public:
         }
 
         int totalWidth = 0;
-        for (std::vector<int>::iterator it = width.begin(); it != width.end(); ++it)
+        for (int & entry : width)
         {
-            (*it) += 3;
-            totalWidth += *it;
+            entry += 3;
+            totalWidth += entry;
         }
         totalWidth = std::max<int>(totalWidth, 20);
 
@@ -3301,10 +3354,10 @@ public:
         }
 
         int totalWidth = 0;
-        for (std::vector<int>::iterator it = width.begin(); it != width.end(); ++it)
+        for (int & entry : width)
         {
-            (*it) += 3;
-            totalWidth += *it;
+            entry += 3;
+            totalWidth += entry;
         }
 
         // Print data headers
@@ -3381,16 +3434,16 @@ public:
                 StringParser::updateWidthNumber<long>(i, width[0]);
                 StringParser::updateWidthNumber<double>(histogram.bin(i)-histogram.width()/2, width[1]);
                 StringParser::updateWidthNumber<double>(histogram.bin(i)+histogram.width()/2, width[2]);
-                StringParser::updateWidthNumber<long long>((long long)freq.at(i), width[3]);
+                StringParser::updateWidthNumber<long long>(static_cast<long long>(freq.at(i)), width[3]);
                 StringParser::updateWidthNumber<double>(pdf.at(i), width[4]);
                 StringParser::updateWidthNumber<double>(cdf.at(i), width[5]);
             }
 
             int totalWidth = 0;
-            for (std::vector<int>::iterator it = width.begin(); it != width.end(); ++it)
+            for (int & entry : width)
             {
-                (*it) += 3;
-                totalWidth += *it;
+                entry += 3;
+                totalWidth += entry;
             }
 
             // Print data headers
@@ -3416,7 +3469,7 @@ public:
                 stream << std::right << std::setw(width[0]) << StringParser::parseNumber<long>(i);
                 stream << std::right << std::setw(width[1]) << StringParser::parseNumber<double>(histogram.bin(i)-histogram.width()/2);
                 stream << std::right << std::setw(width[2]) << StringParser::parseNumber<double>(histogram.bin(i)+histogram.width()/2);
-                stream << std::right << std::setw(width[3]) << StringParser::parseNumber<long long>((long long)freq.at(i));
+                stream << std::right << std::setw(width[3]) << StringParser::parseNumber<long long>(static_cast<long long>(freq.at(i)));
                 stream << std::right << std::setw(width[4]) << StringParser::parseNumber<double>(pdf.at(i));
                 stream << std::right << std::setw(width[5]) << StringParser::parseNumber<double>(cdf.at(i));
                 stream << std::endl;
@@ -3481,7 +3534,7 @@ public:
             unsigned int row = 1;
             if (this->_mode == SamplerOptions::RANDOM)
             {
-                row = 1 + (unsigned int)(rand() % this->_step);
+                row = 1 + static_cast<unsigned int>(rand() % this->_step);
             }
             this->_next = this->_sampled * this->_step + row;
 
@@ -3543,7 +3596,7 @@ public:
         // ==================================================
         // Seed random number generator
         // --------------------------------------------------
-        srand((options.seed == 0 ? (unsigned int)time(0) : options.seed));
+        srand((options.seed == 0 ? static_cast<unsigned int>(time(0)) : options.seed));
 
         // ==================================================
         // Define output stream
@@ -3551,7 +3604,7 @@ public:
         this->_outputFile.open(this->_options.fileOutput.c_str(), std::ios::out);
         if (!this->_outputFile.good() && !this->_options.fileOutput.empty())
         {
-            LOG_MESSAGE(Logger::Level::ERROR, "Output file failed to open. Writting to standard output.");
+            logMessage(Logger::Level::ERROR) << "Output file failed to open. Writting to standard output.";
         }
         this->_outputStream = (this->_outputFile.good() ? &this->_outputFile : &std::cout);
     }
@@ -3561,7 +3614,7 @@ public:
      * @return Status code
      */
     int
-    run(void)
+    run()
     {
 
         // ==================================================
@@ -3576,7 +3629,7 @@ public:
         std::ifstream fileInput(this->_options.fileInput.c_str(), std::ios::in);
         std::istream * source = (fileInput.good() ? &fileInput : &std::cin);
 
-        LOG_MESSAGE(Logger::Level::INFO, ApplicationProperties::NAME << " is starting");
+        logMessage(Logger::Level::INFO) << ApplicationProperties::NAME << " is starting";
 
         // ==================================================
         // Define output writer
@@ -3616,7 +3669,7 @@ public:
             std::string line = StatisticsApp::readline(*source);
             if (!(*source).good())
             {
-                LOG_MESSAGE(Logger::Level::DETAIL, "End of file found. Exiting.");
+                logMessage(Logger::Level::DETAIL) << "End of file found. Exiting.";
                 break;
             }
 
@@ -3627,12 +3680,12 @@ public:
             {
                 if (this->_options.blankEOF)
                 {
-                    LOG_MESSAGE(Logger::Level::DETAIL, "Blank line found. Exiting.");
+                    logMessage(Logger::Level::DETAIL) << "Blank line found. Exiting.";
                     break;
                 }
                 else
                 {
-                    LOG_MESSAGE(Logger::Level::DETAIL, "Blank line found. Skipping.");
+                    logMessage(Logger::Level::DETAIL) << "Blank line found. Skipping.";
                     continue;
                 }
             }
@@ -3675,7 +3728,7 @@ public:
             // --------------------------------------------------
             if (counter <= this->_options.numLinesToSkip)
             {
-                LOG_MESSAGE(Logger::Level::INFO, "Skipping header line.");
+                logMessage(Logger::Level::INFO) << "Skipping header line.";
                 continue;
             }
 
@@ -3684,7 +3737,7 @@ public:
             // --------------------------------------------------
             if (counter > (this->_options.numLinesToSkip + this->_options.numLinesToKeep))
             {
-                LOG_MESSAGE(Logger::Level::INFO, "Skipping remaining lines.");
+                logMessage(Logger::Level::INFO) << "Skipping remaining lines.";
                 break;
             }
 
@@ -3693,7 +3746,7 @@ public:
             // --------------------------------------------------
             if (!sampler.sample())
             {
-                LOG_MESSAGE(Logger::Level::DETAIL, "Row not sampled. Skipping");
+                logMessage(Logger::Level::DETAIL) << "Row not sampled. Skipping";
                 continue;
             }
 
@@ -3702,7 +3755,7 @@ public:
             // --------------------------------------------------
             parser.initialize(line, this->_options.delimiter, this->_options.removeDuplicates);
             StringSplitter::size_type numTokens = parser.size();
-            LOG_MESSAGE(Logger::Level::DETAIL, "Line = " << counter << " - content =\"" << line << "\"");
+            logMessage(Logger::Level::DETAIL) << "Line = " << counter << " - content =\"" << line << "\"";
 
             // ==================================================
             // Check and compute source data dimensions
@@ -3710,7 +3763,7 @@ public:
             bool isDimSet = numDim > 0;
             if (!isDimSet)
             {
-                numDim = (int) numTokens;
+                numDim = static_cast<int>(numTokens);
                 data.resize(numDim);
 
                 // Make sure we only keep column filters if they are within actual number of columns
@@ -3720,21 +3773,21 @@ public:
                 numDimMask = std::accumulate(this->_options.filterColumns.begin(), this->_options.filterColumns.end(), 0);
                 dataMasked.resize(numDimMask);
 
-                LOG_MESSAGE(Logger::Level::INFO, "Data dimensions set to " << numDim);
-                LOG_MESSAGE(Logger::Level::INFO, "Mask dimensions set to " << numDimMask);
+                logMessage(Logger::Level::INFO) << "Data dimensions set to " << numDim;
+                logMessage(Logger::Level::INFO) << "Mask dimensions set to " << numDimMask;
             }
 
-            bool isDimFailed = (numDim != (int) numTokens);
+            bool isDimFailed = (numDim != static_cast<int>(numTokens));
             if (isDimFailed)
             {
-                LOG_MESSAGE(Logger::Level::WARNING, "Line = " << counter << " - Statistics dimensions does not equal data dimensions." << (this->_options.strictParsing ? " Skipping." : ""));
+                logMessage(Logger::Level::WARNING) << "Line = " << counter << " - Statistics dimensions does not equal data dimensions." << (this->_options.strictParsing ? " Skipping." : "");
                 if (this->_options.strictParsing)
                 {
                     continue;
                 }
             }
 
-            LOG_MESSAGE(Logger::Level::DEBUG, "Line = " << counter << " - Number of tokens found: " << numTokens);
+            logMessage(Logger::Level::DEBUG) << "Line = " << counter << " - Number of tokens found: " << numTokens;
 
             // ==================================================
             // Apply string filters
@@ -3742,7 +3795,7 @@ public:
             bool isStringFiltered = this->_options.filterRows.isFiltered(parser.get());
             if (!isStringFiltered)
             {
-                LOG_MESSAGE(Logger::Level::DEBUG, "Line = " << counter << " - filtered out by string filter");
+                logMessage(Logger::Level::DEBUG) << "Line = " << counter << " - filtered out by string filter";
                 continue;
             }
 
@@ -3756,7 +3809,7 @@ public:
 
                 data.at(i).active = parser.toValue<double>(i, data.at(i).value);
 
-                LOG_MESSAGE(Logger::Level::DETAIL, "Line = " << counter << " - " << (data.at(i).active ? "Valid token" : "Invalid token") << " = " << parser.at(i));
+                logMessage(Logger::Level::DETAIL) << "Line = " << counter << " - " << (data.at(i).active ? "Valid token" : "Invalid token") << " = " << parser.at(i);
 
             }
 
@@ -3766,7 +3819,7 @@ public:
             bool isNumericFiltered = this->_options.filterRows.isFiltered(data);
             if (!isNumericFiltered)
             {
-                LOG_MESSAGE(Logger::Level::DEBUG, "Line = " << counter << " - filtered out by numeric filter");
+                logMessage(Logger::Level::DEBUG) << "Line = " << counter << " - filtered out by numeric filter";
                 continue;
             }
 
@@ -3797,12 +3850,12 @@ public:
         // ==================================================
         // Update statistics names
         // --------------------------------------------------
-        if (numDimMask != (long)titles.size())
+        if (numDimMask != static_cast<long>(titles.size()))
         {
             // Show error message if user provided a bad header row
             if (this->_options.headerRow > 0)
             {
-                LOG_MESSAGE(Logger::Level::ERROR, "Size of header titles does not match data dimensions so using indices as header titles.");
+                logMessage(Logger::Level::ERROR) << "Size of header titles does not match data dimensions so using indices as header titles.";
             }
             titles.resize(numDimMask,"");
             for (long i = 0; i < numDimMask; i++)
@@ -3815,7 +3868,7 @@ public:
             this->_tracker.setName(i, titles.at(i));
         }
 
-        LOG_MESSAGE(Logger::Level::INFO, ApplicationProperties::NAME << " is complete");
+        logMessage(Logger::Level::INFO) << ApplicationProperties::NAME << " is complete";
     
         return 0;
         
@@ -3936,7 +3989,7 @@ private:
             }
             
             // Append current character to destination string
-            line += (char) character;
+            line += static_cast<char>(character);
             
         }
         
@@ -4036,7 +4089,7 @@ pdrv(int argc,
     }
     catch (std::exception & ex)
     {
-        LOG_MESSAGE(Logger::Level::FATAL, ex.what());
+        logMessage(Logger::Level::FATAL) << ex.what();
         return AppStatus::FAILED_PARSING;
     }
 
@@ -4053,7 +4106,7 @@ pdrv(int argc,
     // LCOV_EXCL_START
     catch (std::exception & ex)
     {
-        LOG_MESSAGE(Logger::Level::FATAL, ex.what());
+        logMessage(Logger::Level::FATAL) << ex.what();
         return AppStatus::FAILED_RUN;
     }
     // LCOV_EXCL_STOP
@@ -4070,7 +4123,7 @@ pdrv(int argc,
     // LCOV_EXCL_START
     catch (std::exception & ex)
     {
-        LOG_MESSAGE(Logger::Level::FATAL, ex.what());
+        logMessage(Logger::Level::FATAL) << ex.what();
         return AppStatus::FAILED_DISPLAY;
     }
     // LCOV_EXCL_STOP
